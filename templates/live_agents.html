@@ -1,0 +1,327 @@
+{% extends "base.html" %}
+{% block title %}Supervision LIVE des Agents{% endblock %}
+{% block header_title %}Supervision LIVE des Agents{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto px-4 sm:px-6 py-6">
+    <div class="card bg-white dark:bg-dark-800 rounded-xl shadow-sm p-8 border border-gray-100 dark:border-gray-700">
+        <!-- En-tête -->
+        <div class="text-center mb-8">
+            <div class="w-16 h-16 mx-auto rounded-full bg-blue-100 dark:bg-blue-900/20 flex items-center justify-center">
+                <i class="fas fa-users text-blue-600 dark:text-blue-400 text-2xl"></i>
+            </div>
+            <h1 class="text-2xl font-bold text-gray-800 dark:text-white mt-4">
+                Supervision LIVE des Agents
+            </h1>
+            <p class="text-gray-600 dark:text-gray-300 mt-2">
+                Suivi en temps réel des activités des agents
+                <span class="block text-sm text-gray-500 dark:text-gray-400 mt-1">
+                    (Dernière mise à jour: <span id="last-update">{{ date_auj }}</span>)
+                </span>
+            </p>
+        </div>
+
+        <!-- Tableau de supervision -->
+        <div class="card bg-white dark:bg-dark-800 rounded-xl shadow-sm overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                    <thead class="bg-gray-50 dark:bg-gray-700">
+                        <tr>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                Agent
+                            </th>
+                            <th scope="col" class="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                Statut
+                            </th>
+                            <th scope="col" class="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                Heure du statut
+                            </th>
+                            <th scope="col" class="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                1ère connexion
+                            </th>
+                            <th scope="col" class="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                Clients saisis
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody id="tbody-live-agents" class="bg-white dark:bg-dark-800 divide-y divide-gray-200 dark:divide-gray-700">
+                        {% for row in live_data %}
+                        <tr class="
+                            {% if row.statut == 'En pause' %}bg-yellow-50 dark:bg-yellow-900/10
+                            {% elif row.statut == 'Connecté' %}bg-green-50 dark:bg-green-900/10
+                            {% elif row.statut == 'Saisie en cours' %}bg-blue-50 dark:bg-blue-900/10
+                            {% else %}bg-gray-100 dark:bg-gray-700
+                            {% endif %} hover:bg-opacity-75 transition-all">
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="flex items-center">
+                                    <div class="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/20 flex items-center justify-center mr-3">
+                                        <span class="font-bold text-blue-800 dark:text-blue-300">
+                                            {{ row.agent[0] }}
+                                        </span>
+                                    </div>
+                                    <div class="font-bold text-gray-800 dark:text-white">{{ row.agent }}</div>
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-center">
+                                {% if row.statut == "Connecté" %}
+                                    <div class="inline-flex items-center px-3 py-1 rounded-full bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200">
+                                        <div class="w-3 h-3 rounded-full bg-green-500 mr-2 animate-pulse"></div>
+                                        Connecté
+                                    </div>
+                                {% elif row.statut == "En pause" %}
+                                    <div class="inline-flex items-center px-3 py-1 rounded-full bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200">
+                                        <div class="w-3 h-3 rounded-full bg-yellow-500 mr-2"></div>
+                                        En pause
+                                    </div>
+                                {% elif row.statut == "Saisie en cours" %}
+                                    <div class="inline-flex items-center px-3 py-1 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200">
+                                        <div class="w-3 h-3 rounded-full bg-blue-500 mr-2 animate-pulse"></div>
+                                        Saisie en cours
+                                    </div>
+                                {% else %}
+                                    <div class="inline-flex items-center px-3 py-1 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200">
+                                        <div class="w-3 h-3 rounded-full bg-gray-500 mr-2"></div>
+                                        {{ row.statut }}
+                                    </div>
+                                {% endif %}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-center text-gray-800 dark:text-white">
+                                {{ row.heure_statut }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-center text-gray-800 dark:text-white">
+                                {{ row.heure_connexion }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-center">
+                                <div class="text-2xl font-bold text-gray-800 dark:text-white animate-pulse">
+                                    {{ row.nb_clients }}
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Indicateur de mise à jour -->
+        <div class="mt-6 p-4 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 text-center">
+            <div class="flex items-center justify-center gap-2">
+                <i class="fas fa-sync-alt text-blue-500 animate-spin"></i>
+                <span class="text-blue-800 dark:text-blue-200">Mise à jour automatique toutes les 10 secondes</span>
+            </div>
+        </div>
+        
+        <!-- Statistiques résumées -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8">
+            <div class="card bg-white dark:bg-dark-800 rounded-xl shadow-sm p-6 border border-gray-100 dark:border-gray-700">
+                <div class="flex items-center gap-4">
+                    <div class="p-3 rounded-lg bg-green-100 dark:bg-green-900/20">
+                        <i class="fas fa-user-check text-green-600 dark:text-green-400 text-xl"></i>
+                    </div>
+                    <div>
+                        <p class="text-sm font-medium text-gray-600 dark:text-gray-300">Agents connectés</p>
+                        <p class="text-2xl font-bold text-gray-800 dark:text-white">{{ connected_count }}</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card bg-white dark:bg-dark-800 rounded-xl shadow-sm p-6 border border-gray-100 dark:border-gray-700">
+                <div class="flex items-center gap-4">
+                    <div class="p-3 rounded-lg bg-yellow-100 dark:bg-yellow-900/20">
+                        <i class="fas fa-coffee text-yellow-600 dark:text-yellow-400 text-xl"></i>
+                    </div>
+                    <div>
+                        <p class="text-sm font-medium text-gray-600 dark:text-gray-300">Agents en pause</p>
+                        <p class="text-2xl font-bold text-gray-800 dark:text-white">{{ paused_count }}</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card bg-white dark:bg-dark-800 rounded-xl shadow-sm p-6 border border-gray-100 dark:border-gray-700">
+                <div class="flex items-center gap-4">
+                    <div class="p-3 rounded-lg bg-blue-100 dark:bg-blue-900/20">
+                        <i class="fas fa-user-edit text-blue-600 dark:text-blue-400 text-xl"></i>
+                    </div>
+                    <div>
+                        <p class="text-sm font-medium text-gray-600 dark:text-gray-300">Saisies en cours</p>
+                        <p class="text-2xl font-bold text-gray-800 dark:text-white">{{ active_count }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Fonction pour mettre à jour les agents
+function updateLiveAgents() {
+    fetch("/api/live_agents")
+        .then(response => response.json())
+        .then(data => {
+            // Mettre à jour l'heure de dernière mise à jour
+            const now = new Date();
+            document.getElementById('last-update').textContent = 
+                now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+            
+            let tbody = document.getElementById('tbody-live-agents');
+            tbody.innerHTML = '';
+            
+            data.live_data.forEach(row => {
+                let statusBadge;
+                let rowClass;
+                
+                // Déterminer le badge de statut et la classe de ligne
+                if (row.statut === "Connecté") {
+                    statusBadge = `
+                        <div class="inline-flex items-center px-3 py-1 rounded-full bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200">
+                            <div class="w-3 h-3 rounded-full bg-green-500 mr-2 animate-pulse"></div>
+                            Connecté
+                        </div>
+                    `;
+                    rowClass = "bg-green-50 dark:bg-green-900/10";
+                } else if (row.statut === "En pause") {
+                    statusBadge = `
+                        <div class="inline-flex items-center px-3 py-1 rounded-full bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200">
+                            <div class="w-3 h-3 rounded-full bg-yellow-500 mr-2"></div>
+                            En pause
+                        </div>
+                    `;
+                    rowClass = "bg-yellow-50 dark:bg-yellow-900/10";
+                } else if (row.statut === "Saisie en cours") {
+                    statusBadge = `
+                        <div class="inline-flex items-center px-3 py-1 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200">
+                            <div class="w-3 h-3 rounded-full bg-blue-500 mr-2 animate-pulse"></div>
+                            Saisie en cours
+                        </div>
+                    `;
+                    rowClass = "bg-blue-50 dark:bg-blue-900/10";
+                } else {
+                    statusBadge = `
+                        <div class="inline-flex items-center px-3 py-1 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200">
+                            <div class="w-3 h-3 rounded-full bg-gray-500 mr-2"></div>
+                            ${row.statut}
+                        </div>
+                    `;
+                    rowClass = "bg-gray-100 dark:bg-gray-700";
+                }
+                
+                // Créer la ligne
+                const tr = document.createElement('tr');
+                tr.className = `${rowClass} hover:bg-opacity-75 transition-all`;
+                tr.innerHTML = `
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="flex items-center">
+                            <div class="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/20 flex items-center justify-center mr-3">
+                                <span class="font-bold text-blue-800 dark:text-blue-300">
+                                    ${row.agent[0]}
+                                </span>
+                            </div>
+                            <div class="font-bold text-gray-800 dark:text-white">${row.agent}</div>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-center">
+                        ${statusBadge}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-center text-gray-800 dark:text-white">
+                        ${row.heure_statut}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-center text-gray-800 dark:text-white">
+                        ${row.heure_connexion}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-center">
+                        <div class="text-2xl font-bold text-gray-800 dark:text-white animate-pulse">
+                            ${row.nb_clients}
+                        </div>
+                    </td>
+                `;
+                
+                // Ajouter une animation d'entrée
+                tr.style.opacity = '0';
+                tr.style.transform = 'translateY(10px)';
+                tr.style.transition = 'all 0.4s ease';
+                
+                setTimeout(() => {
+                    tr.style.opacity = '1';
+                    tr.style.transform = 'translateY(0)';
+                }, 10);
+                
+                tbody.appendChild(tr);
+            });
+        });
+}
+
+// Rafraîchir toutes les 10 secondes
+setInterval(updateLiveAgents, 10000);
+
+// Mettre à jour immédiatement au chargement
+document.addEventListener('DOMContentLoaded', function() {
+    updateLiveAgents();
+    
+    // Ajouter un effet de pulse au titre
+    const title = document.querySelector('h1');
+    setInterval(() => {
+        title.classList.toggle('animate-pulse');
+    }, 2000);
+});
+</script>
+
+<style>
+    /* Animation pour les lignes */
+    @keyframes fadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+    
+    /* Effet de pulse pour les clients saisis */
+    .clients-count {
+        animation: pulse 2s infinite;
+    }
+    
+    @keyframes pulse {
+        0% { transform: scale(1); }
+        50% { transform: scale(1.05); }
+        100% { transform: scale(1); }
+    }
+    
+    /* Effet de transition pour les lignes */
+    tbody tr {
+        transition: background-color 0.3s ease;
+    }
+    
+    /* Animation pour l'icône de synchronisation */
+    @keyframes spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+    }
+    
+    .fa-sync-alt {
+        animation: spin 2s linear infinite;
+    }
+    
+    /* Style pour les badges de statut */
+    .status-badge {
+        transition: all 0.3s ease;
+        display: inline-flex;
+        align-items: center;
+        padding: 0.4rem 1rem;
+        border-radius: 9999px;
+        font-size: 0.875rem;
+        font-weight: 500;
+    }
+    
+    .status-badge:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    }
+    
+    .dark .status-badge:hover {
+        box-shadow: 0 4px 6px -1px rgba(255, 255, 255, 0.1), 0 2px 4px -1px rgba(255, 255, 255, 0.06);
+    }
+</style>
+{% endblock %}

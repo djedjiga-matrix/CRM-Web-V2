@@ -1,0 +1,388 @@
+{% extends "base.html" %}
+{% block title %}Dashboard Valandre{% endblock %}
+{% block header_title %}Tableau de bord (Campagne VALANDRE){% endblock %}
+
+{% block content %}
+<div class="max-w-full mx-auto px-4 sm:px-6 py-6">
+    <!-- En-tête du dashboard -->
+    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+        <div class="flex items-center gap-4">
+            <div class="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
+                <i class="fas fa-chart-bar text-primary text-2xl"></i>
+            </div>
+            <div>
+                <h1 class="text-2xl font-bold text-gray-800 dark:text-white">Dashboard Valandre</h1>
+                <p class="text-gray-600 dark:text-gray-300">Suivi des performances de la campagne</p>
+            </div>
+        </div>
+        
+        <div class="flex flex-col sm:flex-row gap-4">
+            <!-- Statistiques rapides -->
+            <div class="flex items-center gap-4">
+                <div class="card bg-white dark:bg-dark-800 rounded-xl shadow-sm p-4 border border-gray-100 dark:border-gray-700">
+                    <div class="flex items-center gap-3">
+                        <div class="p-2 rounded-lg bg-green-100 dark:bg-green-900/20">
+                            <i class="fas fa-check-circle text-green-500 text-xl"></i>
+                        </div>
+                        <div>
+                            <p class="text-sm text-gray-500 dark:text-gray-400">Validés aujourd'hui</p>
+                            <p class="text-xl font-bold text-gray-800 dark:text-white">{{ count_valide }}</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card bg-white dark:bg-dark-800 rounded-xl shadow-sm p-4 border border-gray-100 dark:border-gray-700">
+                    <div class="flex items-center gap-3">
+                        <div class="p-2 rounded-lg bg-red-100 dark:bg-red-900/20">
+                            <i class="fas fa-times-circle text-red-500 text-xl"></i>
+                        </div>
+                        <div>
+                            <p class="text-sm text-gray-500 dark:text-gray-400">Refusés aujourd'hui</p>
+                            <p class="text-xl font-bold text-gray-800 dark:text-white">{{ count_refuse }}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Profil agent -->
+            <div class="flex items-center gap-3 bg-white dark:bg-dark-800 rounded-xl shadow-sm p-3 border border-gray-100 dark:border-gray-700">
+                {% if agent_photo %}
+                    <img src="{{ agent_photo }}" alt="Photo de profil" class="w-12 h-12 rounded-full border-2 border-primary">
+                {% else %}
+                    <div class="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+                        <i class="fas fa-user text-primary"></i>
+                    </div>
+                {% endif %}
+                <div>
+                    <p class="font-medium text-gray-800 dark:text-white">{{ session.agent_nom }}</p>
+                    <p class="text-sm text-gray-500 dark:text-gray-400">{{ session.agent_role }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Actions rapides -->
+    <div class="flex flex-wrap gap-3 mb-6">
+        <a href="{{ url_for('export_excel_valandre',
+        date_debut=request.args.get('date_debut', ''),
+        date_fin=request.args.get('date_fin', ''),
+        telephone=request.args.get('telephone', ''),
+        agent=request.args.get('agent', ''),
+        statut=request.args.get('statut', '')) }}" 
+           class="flex items-center gap-2 px-4 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white shadow-md">
+            <i class="fas fa-file-excel"></i>
+            Exporter Excel
+        </a>
+        
+        <a href="{{ url_for('formulaire_valandre') }}" 
+           class="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary hover:bg-primary/90 text-white shadow-md">
+            <i class="fas fa-user-plus"></i>
+            Ajouter un client
+        </a>
+        
+     
+        
+    </div>
+    
+    <!-- Filtres -->
+    <div class="card bg-white dark:bg-dark-800 rounded-xl shadow-sm p-6 border border-gray-100 dark:border-gray-700 mb-6">
+        <h2 class="text-lg font-bold mb-4 text-gray-800 dark:text-white">Filtrer les données</h2>
+        
+        <form method="get" action="{{ url_for('dashboard_valandre') }}">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+                <div>
+                    <label class="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">Recherche</label>
+                    <input type="text" name="recherche" class="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-primary/50"
+                        placeholder="Nom, prénom ou téléphone" value="{{ request.args.get('recherche', '') }}">
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">Statut</label>
+                    <select name="statut" class="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-primary/50">
+                        <option value="">Tous les statuts</option>
+                        <option value="Nouveau" {% if request.args.get('statut') == 'Nouveau' %}selected{% endif %}>Nouveau</option>
+                        <option value="En cours" {% if request.args.get('statut') == 'En cours' %}selected{% endif %}>En cours</option>
+                        <option value="valide" {% if request.args.get('statut') == 'valide' %}selected{% endif %}>Valide</option>
+                        <option value="non valide" {% if request.args.get('statut') == 'non valide' %}selected{% endif %}>Non valide</option>
+                    </select>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">Agent</label>
+                    <select name="agent" class="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-primary/50">
+                        <option value="">Tous les agents</option>
+                        {% for ag in agents %}
+                        <option value="{{ ag }}" {% if request.args.get('agent') == ag %}selected{% endif %}>{{ ag }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">Date début</label>
+                    <input type="date" name="date_debut" class="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-primary/50"
+                        value="{{ request.args.get('date_debut', '') }}">
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">Date fin</label>
+                    <input type="date" name="date_fin" class="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-primary/50"
+                        value="{{ request.args.get('date_fin', '') }}">
+                </div>
+                
+                <div class="flex items-end gap-2">
+                    <button type="submit" class="w-full px-4 py-2 rounded-lg bg-primary hover:bg-primary/90 text-white">
+                        <i class="fas fa-search mr-2"></i> Rechercher
+                    </button>
+                    <a href="{{ url_for('dashboard_valandre') }}" class="px-4 py-2 rounded-lg bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-800 dark:text-white">
+                        <i class="fas fa-sync-alt"></i>
+                    </a>
+                </div>
+            </div>
+        </form>
+    </div>
+    
+    <!-- Tableau des clients -->
+    <div class="card bg-white dark:bg-dark-800 rounded-xl shadow-sm p-6 border border-gray-100 dark:border-gray-700 overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                <thead class="bg-gray-50 dark:bg-gray-700">
+                    <tr>
+                        <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider sticky left-0 bg-gray-50 dark:bg-gray-700 z-10">
+                            Date signature
+                        </th>
+                        <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider sticky left-16 bg-gray-50 dark:bg-gray-700 z-10">
+                            Vendeur
+                        </th>
+                        <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider sticky left-32 bg-gray-50 dark:bg-gray-700 z-10">
+                            Client
+                        </th>
+                        <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider sticky left-64 bg-gray-50 dark:bg-gray-700 z-10">
+                            Téléphone
+                        </th>
+                        <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-blue-100 dark:bg-blue-900/30">
+                            STRATO
+                        </th>
+                        <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-300 dark:bg-gray-600">
+                            LSR
+                        </th>
+                        <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-pink-200 dark:bg-pink-900/30">
+                            PRESSE
+                        </th>
+                        <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-yellow-100 dark:bg-yellow-900/30">
+                            ENI
+                        </th>
+                        <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-blue-100 dark:bg-blue-900/30">
+                            SERENITY
+                        </th>
+                        <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-amber-700 dark:bg-amber-900/30 text-white dark:text-amber-200">
+                            PROTEC
+                        </th>
+                        <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-cyan-100 dark:bg-cyan-900/30">
+                            WEKIWI
+                        </th>
+                        <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                            Agent
+                        </th>
+                        <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                            Actions
+                        </th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white dark:bg-dark-800 divide-y divide-gray-200 dark:divide-gray-700">
+                    {% for c in clients %}
+                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                        <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-800 dark:text-white sticky left-0 bg-white dark:bg-dark-800">
+                            {{ c.DATE_SIGNATURE }}
+                        </td>
+                        <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-800 dark:text-white sticky left-16 bg-white dark:bg-dark-800">
+                            <div>{{ c.NOM_VENDEUR }}</div>
+                            <div class="text-xs text-gray-500">{{ c.PRENOM_VENDEUR }}</div>
+                        </td>
+                        <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-800 dark:text-white sticky left-32 bg-white dark:bg-dark-800">
+                            <div>{{ c.TITRE }} {{ c.NOM_CLIENT }}</div>
+                            <div class="text-xs text-gray-500">{{ c.PRENOM_CLIENT }}</div>
+                        </td>
+                        <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-800 dark:text-white sticky left-64 bg-white dark:bg-dark-800">
+                            {{ c.TELEPHONE }}
+                        </td>
+                        <!-- STRATO -->
+                        <td class="px-4 py-3 whitespace-nowrap text-sm bg-blue-50 dark:bg-blue-900/10">
+                            <div class="font-medium">{{ c.STRATO_NUM }}</div>
+                            <div class="text-xs {% if c.STRATO_STATUT == 'valide' %}text-green-600 dark:text-green-400{% else %}text-red-600 dark:text-red-400{% endif %}">
+                                {{ c.STRATO_STATUT }}
+                            </div>
+                            <div class="text-xs text-gray-500 truncate max-w-xs">{{ c.STRATO_REMARQUE }}</div>
+                        </td>
+                        <!-- LSR -->
+                        <td class="px-4 py-3 whitespace-nowrap text-sm bg-gray-100 dark:bg-gray-700">
+                            <div class="font-medium">{{ c.LSR_NUM }}</div>
+                            <div class="text-xs {% if c.LSR_STATUT == 'valide' %}text-green-600 dark:text-green-400{% else %}text-red-600 dark:text-red-400{% endif %}">
+                                {{ c.LSR_STATUT }}
+                            </div>
+                            <div class="text-xs text-gray-300 dark:text-gray-400 truncate max-w-xs">{{ c.LSR_REMARQUE }}</div>
+                        </td>
+                        <!-- PRESSE -->
+                        <td class="px-4 py-3 whitespace-nowrap text-sm bg-pink-50 dark:bg-pink-900/10">
+                            <div class="{% if c.PRESSE_STATUT == 'valide' %}text-green-600 dark:text-green-400{% else %}text-red-600 dark:text-red-400{% endif %}">
+                                {{ c.PRESSE_STATUT }}
+                            </div>
+                            <div class="text-xs text-gray-500 truncate max-w-xs">{{ c.PRESSE_REMARQUE }}</div>
+                        </td>
+                        <!-- ENI -->
+                        <td class="px-4 py-3 whitespace-nowrap text-sm bg-yellow-50 dark:bg-yellow-900/10">
+                            <div class="font-medium">{{ c.ENI_NUM }}</div>
+                            <div class="text-xs {% if c.ENI_STATUT == 'valide' %}text-green-600 dark:text-green-400{% else %}text-red-600 dark:text-red-400{% endif %}">
+                                {{ c.ENI_STATUT }}
+                            </div>
+                            <div class="text-xs text-gray-500 truncate max-w-xs">{{ c.ENI_REMARQUE }}</div>
+                        </td>
+                        <!-- SERENITY -->
+                        <td class="px-4 py-3 whitespace-nowrap text-sm bg-blue-50 dark:bg-blue-900/10">
+                            <div class="font-medium">{{ c.SERENITY_NUM }}</div>
+                            <div class="text-xs {% if c.SERENITY_STATUT == 'valide' %}text-green-600 dark:text-green-400{% else %}text-red-600 dark:text-red-400{% endif %}">
+                                {{ c.SERENITY_STATUT }}
+                            </div>
+                            <div class="text-xs text-gray-500 truncate max-w-xs">{{ c.SERENITY_REMARQUE }}</div>
+                        </td>
+                        <!-- PROTEC -->
+                        <td class="px-4 py-3 whitespace-nowrap text-sm bg-amber-700/10 dark:bg-amber-900/20 text-amber-900 dark:text-amber-200">
+                            <div class="font-medium">{{ c.PROTEC_ALLIANCE_NUM }}</div>
+                            <div class="text-xs {% if c.PROTEC_ALLIANCE_STATUT == 'valide' %}text-green-600 dark:text-green-400{% else %}text-red-600 dark:text-red-400{% endif %}">
+                                {{ c.PROTEC_ALLIANCE_STATUT }}
+                            </div>
+                            <div class="text-xs text-amber-800 dark:text-amber-300 truncate max-w-xs">{{ c.PROTEC_ALLIANCE_REMARQUE }}</div>
+                        </td>
+                        <!-- WEKIWI -->
+                        <td class="px-4 py-3 whitespace-nowrap text-sm bg-cyan-50 dark:bg-cyan-900/10">
+                            <div class="font-medium">{{ c.WEKIWI_NUM }}</div>
+                            <div class="text-xs {% if c.WEKIWI_STATUT == 'valide' %}text-green-600 dark:text-green-400{% else %}text-red-600 dark:text-red-400{% endif %}">
+                                {{ c.WEKIWI_STATUT }}
+                            </div>
+                            <div class="text-xs text-gray-500 truncate max-w-xs">{{ c.WEKIWI_REMARQUE }}</div>
+                        </td>
+                        <!-- Agent -->
+                        <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-800 dark:text-white">
+                            {{ c.AGENT }}
+                        </td>
+                        <!-- Actions -->
+                        <td class="px-4 py-3 whitespace-nowrap text-sm">
+                            <a href="{{ url_for('modifier_client', client_id=c.id) }}" 
+                               class="inline-flex items-center px-3 py-1 rounded-lg bg-yellow-500 hover:bg-yellow-600 text-white text-sm">
+                                <i class="fas fa-edit mr-1"></i> Modifier
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- Pagination -->
+        {% if pagination %}
+        <div class="mt-6 flex justify-center">
+            <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                {% if pagination.has_prev %}
+                <a href="{{ url_for('dashboard_valandre', page=pagination.prev_num, **request.args) }}" 
+                   class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-dark-800 text-sm font-medium text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700">
+                    <i class="fas fa-chevron-left"></i>
+                </a>
+                {% endif %}
+                
+                {% for page_num in pagination.iter_pages() %}
+                    {% if page_num %}
+                        {% if page_num != pagination.page %}
+                        <a href="{{ url_for('dashboard_valandre', page=page_num, **request.args) }}" 
+                           class="relative inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-dark-800 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700">
+                            {{ page_num }}
+                        </a>
+                        {% else %}
+                        <span class="relative inline-flex items-center px-4 py-2 border border-primary bg-primary text-white text-sm font-medium">
+                            {{ page_num }}
+                        </span>
+                        {% endif %}
+                    {% else %}
+                        <span class="relative inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-dark-800 text-sm font-medium text-gray-700">
+                            ...
+                        </span>
+                    {% endif %}
+                {% endfor %}
+                
+                {% if pagination.has_next %}
+                <a href="{{ url_for('dashboard_valandre', page=pagination.next_num, **request.args) }}" 
+                   class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-dark-800 text-sm font-medium text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700">
+                    <i class="fas fa-chevron-right"></i>
+                </a>
+                {% endif %}
+            </nav>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Styles spécifiques à la page -->
+<style>
+    /* Style pour les en-têtes figés */
+    th.sticky, td.sticky {
+        position: sticky;
+        z-index: 10;
+    }
+    
+    /* Style pour les lignes du tableau */
+    tbody tr {
+        transition: background-color 0.2s ease;
+    }
+    
+    /* Style pour les cellules de statut */
+    .status-valid {
+        background-color: rgba(16, 185, 129, 0.1);
+        color: #065f46;
+    }
+    
+    .status-invalid {
+        background-color: rgba(239, 68, 68, 0.1);
+        color: #991b1b;
+    }
+    
+    .dark .status-valid {
+        background-color: rgba(16, 185, 129, 0.2);
+        color: #6ee7b7;
+    }
+    
+    .dark .status-invalid {
+        background-color: rgba(239, 68, 68, 0.2);
+        color: #fca5a5;
+    }
+    
+    /* Style pour le défilement horizontal */
+    .overflow-x-auto {
+        scrollbar-width: thin;
+        scrollbar-color: #cbd5e0 #f1f5f9;
+    }
+    
+    .dark .overflow-x-auto {
+        scrollbar-color: #4b5563 #1f2937;
+    }
+    
+    .overflow-x-auto::-webkit-scrollbar {
+        height: 8px;
+    }
+    
+    .overflow-x-auto::-webkit-scrollbar-track {
+        background: #f1f5f9;
+        border-radius: 4px;
+    }
+    
+    .dark .overflow-x-auto::-webkit-scrollbar-track {
+        background: #1f2937;
+    }
+    
+    .overflow-x-auto::-webkit-scrollbar-thumb {
+        background: #cbd5e0;
+        border-radius: 4px;
+    }
+    
+    .dark .overflow-x-auto::-webkit-scrollbar-thumb {
+        background: #4b5563;
+    }
+</style>
+{% endblock %}

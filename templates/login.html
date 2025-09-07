@@ -1,0 +1,176 @@
+{% extends "base.html" %}
+{% block title %}Connexion{% endblock %}
+
+{% block content %}
+<div class="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-dark-900 p-4">
+    <div class="card bg-white dark:bg-dark-800 rounded-2xl shadow-xl p-8 w-full max-w-md transition-all duration-300 hover:shadow-2xl">
+        <!-- En-tête -->
+        <div class="text-center mb-8">
+            <div class="mx-auto w-24 h-24 rounded-2xl bg-blue-100 dark:bg-blue-900/20 flex items-center justify-center mb-4 border-2 border-blue-200 dark:border-blue-700">
+                <i class="fas fa-shield-alt text-blue-600 dark:text-blue-400 text-3xl"></i>
+            </div>
+            <h1 class="text-2xl font-bold text-gray-800 dark:text-white">
+                Connexion agent
+            </h1>
+            <p class="text-gray-600 dark:text-gray-300 mt-2">
+                Accédez à votre CRM QuantumCall
+                <span class="block text-sm text-blue-500 dark:text-blue-300 mt-1">(Saisie de données SFR fibre)</span>
+            </p>
+        </div>
+
+        <!-- Messages flash -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        <div class="mb-6 space-y-3">
+            {% for category, message in messages %}
+            <div class="alert alert-{{ category }} p-3 rounded-lg border border-{{ category }}-200 dark:border-{{ category }}-700 bg-{{ category }}-50 dark:bg-{{ category }}-900/20 text-{{ category }}-800 dark:text-{{ category }}-200 text-center">
+                {{ message }}
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+        {% endwith %}
+
+        <!-- Formulaire de connexion -->
+        <form method="post" autocomplete="off" class="space-y-6">
+            <div>
+                <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
+                    Email
+                </label>
+                <div class="relative">
+                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <i class="fas fa-envelope text-gray-400 dark:text-gray-500"></i>
+                    </div>
+                    <input name="LOGIN" type="email" 
+                           class="w-full pl-10 pr-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                           placeholder="votre@email.com" required autocomplete="username">
+                </div>
+            </div>
+            
+            <div>
+                <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
+                    Mot de passe
+                </label>
+                <div class="relative">
+                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <i class="fas fa-lock text-gray-400 dark:text-gray-500"></i>
+                    </div>
+                    <input name="MDP" type="password" 
+                           class="w-full pl-10 pr-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                           placeholder="••••••••" required autocomplete="current-password">
+                </div>
+            </div>
+            
+            <div class="flex items-center justify-between">
+                <div class="flex items-center">
+                    <input id="remember-me" name="remember-me" type="checkbox" 
+                           class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                    <label for="remember-me" class="ml-2 block text-sm text-gray-700 dark:text-gray-300">
+                        Se souvenir de moi
+                    </label>
+                </div>
+                <div class="text-sm">
+                    <a href="#" class="font-medium text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300">
+                        Mot de passe oublié?
+                    </a>
+                </div>
+            </div>
+            
+            <div>
+                <button type="submit" 
+                        class="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-300 hover:scale-[1.02]">
+                    <i class="fas fa-sign-in-alt mr-2"></i>
+                    Se connecter
+                </button>
+            </div>
+        </form>
+        
+        <!-- Footer -->
+        <div class="mt-8 text-center text-sm text-gray-500 dark:text-gray-400">
+            &copy; {{ 2025 }} QuantumCall - Tous droits réservés
+        </div>
+    </div>
+</div>
+
+<!-- Styles spécifiques à la page -->
+<style>
+    /* Animation pour le formulaire */
+    .card {
+        animation: fadeInUp 0.6s ease-out forwards;
+    }
+    
+    @keyframes fadeInUp {
+        from {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+    
+    /* Style pour les champs de formulaire */
+    input {
+        transition: all 0.2s ease;
+    }
+    
+    input:focus {
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
+    }
+    
+    .dark input:focus {
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.3);
+    }
+    
+    /* Effet pour le bouton de connexion */
+    .login-btn {
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .login-btn::after {
+        content: '';
+        position: absolute;
+        top: -50%;
+        left: -60%;
+        width: 20px;
+        height: 200%;
+        background: rgba(255, 255, 255, 0.3);
+        transform: rotate(30deg);
+        transition: all 0.6s;
+    }
+    
+    .login-btn:hover::after {
+        left: 120%;
+    }
+    
+    /* Style pour les alertes */
+    .alert {
+        transition: all 0.3s ease;
+    }
+</style>
+
+<script>
+// Animation pour les éléments du formulaire
+document.addEventListener('DOMContentLoaded', function() {
+    const formElements = document.querySelectorAll('input, button, label');
+    
+    formElements.forEach((el, index) => {
+        el.style.opacity = '0';
+        el.style.transform = 'translateY(10px)';
+        el.style.transition = 'all 0.4s ease';
+        
+        setTimeout(() => {
+            el.style.opacity = '1';
+            el.style.transform = 'translateY(0)';
+        }, 100 * (index + 1));
+    });
+    
+    // Focus sur le champ email
+    setTimeout(() => {
+        document.querySelector('input[name="LOGIN"]').focus();
+    }, 500);
+});
+</script>
+{% endblock %}

@@ -1,0 +1,204 @@
+{% extends "base.html" %}
+{% block header_title %}Paramètres Agents{% endblock %}
+{% block content %}
+
+<div class="max-w-6xl mx-auto px-4 py-8">
+  <!-- Barre d'info utilisateur -->
+  {% if session.agent_nom %}
+  <div class="flex items-center justify-end mb-6">
+    <div class="bg-gray-100 dark:bg-gray-800 px-4 py-2 rounded-lg flex items-center">
+      <span class="text-gray-700 dark:text-gray-300 mr-2">Connecté en tant que</span>
+      <strong class="text-primary dark:text-secondary">{{ session.agent_nom }}</strong>
+      <span class="mx-2 text-gray-400">|</span>
+      <span class="text-gray-600 dark:text-gray-400">{{ session.agent_role }}</span>
+    </div>
+    <a href="{{ url_for('logout') }}" 
+       class="ml-4 px-4 py-2 bg-red-100 dark:bg-red-900/30 hover:bg-red-200 dark:hover:bg-red-800 text-red-700 dark:text-red-300 font-medium rounded-lg flex items-center transition-colors">
+      <i class="fas fa-sign-out-alt mr-2"></i>
+      Déconnexion
+    </a>
+  </div>
+  {% endif %}
+
+  <!-- Carte principale -->
+  <div class="bg-white dark:bg-dark-800 rounded-2xl shadow-xl overflow-hidden transition-all duration-300 hover:shadow-2xl">
+    <!-- En-tête -->
+    <div class="bg-gradient-to-r from-primary to-secondary p-6">
+      <h1 class="text-2xl font-bold text-white flex items-center justify-center">
+        <i class="fas fa-users-cog mr-3"></i>
+        Gestion des Agents
+      </h1>
+    </div>
+    
+    <div class="p-6">
+      <!-- Messages flash -->
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          <div class="mb-6">
+            {% for category, message in messages %}
+              <div class="p-4 rounded-lg mb-3 
+                   {% if category == 'success' %}bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border-l-4 border-green-500{% endif %}
+                   {% if category == 'danger' %}bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 border-l-4 border-red-500{% endif %}
+                   {% if category == 'warning' %}bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 border-l-4 border-yellow-500{% endif %}">
+                <div class="flex items-start">
+                  <div class="flex-shrink-0">
+                    {% if category == 'success' %}<i class="fas fa-check-circle text-xl"></i>{% endif %}
+                    {% if category == 'danger' %}<i class="fas fa-exclamation-circle text-xl"></i>{% endif %}
+                    {% if category == 'warning' %}<i class="fas fa-exclamation-triangle text-xl"></i>{% endif %}
+                  </div>
+                  <div class="ml-3">
+                    <p>{{ message }}</p>
+                  </div>
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      {% endwith %}
+      
+      <!-- Formulaire de création -->
+      <div class="mb-8 bg-gray-50 dark:bg-gray-700/30 rounded-xl p-6">
+        <h2 class="text-xl font-bold text-gray-800 dark:text-gray-200 mb-4 flex items-center">
+          <i class="fas fa-user-plus mr-2 text-primary"></i>
+          Créer un nouvel agent
+        </h2>
+        
+        <form method="post" enctype="multipart/form-data" autocomplete="off">
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+            <!-- Nom -->
+            <div>
+              <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
+                Nom complet
+              </label>
+              <input name="NOM" required
+                  class="w-full px-4 py-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 focus:ring-2 focus:ring-primary/50 focus:border-transparent text-gray-900 dark:text-white">
+            </div>
+            
+            <!-- Email -->
+            <div>
+              <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
+                Email
+              </label>
+              <input name="LOGIN" type="email" required
+                  class="w-full px-4 py-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 focus:ring-2 focus:ring-primary/50 focus:border-transparent text-gray-900 dark:text-white">
+            </div>
+            
+            <!-- Mot de passe -->
+            <div>
+              <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
+                Mot de passe
+              </label>
+              <input name="MDP" type="password" required
+                  class="w-full px-4 py-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 focus:ring-2 focus:ring-primary/50 focus:border-transparent text-gray-900 dark:text-white">
+            </div>
+            
+            <!-- Rôle -->
+            <div>
+              <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
+                Rôle
+              </label>
+              <select name="ROLE" required
+                  class="w-full px-4 py-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 focus:ring-2 focus:ring-primary/50 focus:border-transparent text-gray-900 dark:text-white">
+                <option value="agent">Agent</option>
+                <option value="admin">Administrateur</option>
+                <option value="superviseur">Superviseur</option>
+              </select>
+            </div>
+          </div>
+          
+          <!-- Photo de profil -->
+          <div class="mb-6">
+            <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
+              Photo de profil
+            </label>
+            <input type="file" name="photo" accept="image/*" 
+                class="block w-full text-sm text-gray-500 dark:text-gray-400
+                    file:mr-4 file:py-2 file:px-4
+                    file:rounded-lg file:border-0
+                    file:text-sm file:font-medium
+                    file:bg-primary file:text-white
+                    hover:file:bg-primary/90
+                    transition-colors">
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              PNG, JPG, JPEG (max 2MB)
+            </p>
+          </div>
+          
+          <!-- Boutons -->
+          <div class="flex gap-4">
+            <button type="submit"
+                class="px-6 py-3 bg-gradient-to-r from-primary to-secondary hover:from-primary/90 hover:to-secondary/90 text-white font-semibold rounded-lg shadow-md transition-all duration-300 flex items-center">
+              <i class="fas fa-plus-circle mr-2"></i>
+              Ajouter l'agent
+            </button>
+            
+            <a href="{{ url_for('dashboard') }}"
+                class="px-6 py-3 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 font-semibold rounded-lg shadow-md transition-colors duration-300 flex items-center">
+              <i class="fas fa-home mr-2"></i>
+              Accueil
+            </a>
+          </div>
+        </form>
+      </div>
+      
+      <!-- Liste des agents -->
+      <h2 class="text-xl font-bold text-gray-800 dark:text-gray-200 mb-4 flex items-center">
+        <i class="fas fa-list-ul mr-2 text-primary"></i>
+        Liste des agents
+      </h2>
+      
+      <div class="overflow-x-auto rounded-xl shadow-md">
+        <table class="w-full text-sm text-left text-gray-700 dark:text-gray-300">
+          <thead class="text-xs uppercase bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300">
+            <tr>
+              <th scope="col" class="px-6 py-3">ID</th>
+              <th scope="col" class="px-6 py-3">Nom</th>
+              <th scope="col" class="px-6 py-3">Email</th>
+              <th scope="col" class="px-6 py-3">Rôle</th>
+              <th scope="col" class="px-6 py-3">Campagne</th>
+              <th scope="col" class="px-6 py-3 text-center">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for agent in agents %}
+            <tr class="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50">
+              <td class="px-6 py-4 font-medium text-gray-900 dark:text-white">{{ agent[0] }}</td>
+              <td class="px-6 py-4">{{ agent[1] }}</td>
+              <td class="px-6 py-4">{{ agent[2] }}</td>
+              <td class="px-6 py-4">
+                <span class="px-3 py-1 rounded-full text-xs font-medium
+                  {% if agent[3] == 'admin' %}bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300
+                  {% elif agent[3] == 'superviseur' %}bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300
+                  {% else %}bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300{% endif %}">
+                  {{ agent[3] }}
+                </span>
+              </td>
+              <td class="px-6 py-4">{{ agent[4] or '-' }}</td>
+              <td class="px-6 py-4">
+                <div class="flex justify-center space-x-2">
+                  <a href="{{ url_for('modifier_agent', agent_id=agent[0]) }}" 
+                     class="px-4 py-2 bg-amber-100 dark:bg-amber-900/30 hover:bg-amber-200 dark:hover:bg-amber-800 text-amber-800 dark:text-amber-300 rounded-lg flex items-center transition-colors">
+                    <i class="fas fa-edit mr-1"></i>
+                    Modifier
+                  </a>
+                  
+                  <form method="post" action="{{ url_for('supprimer_agent', agent_id=agent[0]) }}" 
+                        onsubmit="return confirm('Êtes-vous sûr de vouloir supprimer cet agent ?');">
+                    <button type="submit" 
+                            class="px-4 py-2 bg-red-100 dark:bg-red-900/30 hover:bg-red-200 dark:hover:bg-red-800 text-red-800 dark:text-red-300 rounded-lg flex items-center transition-colors">
+                      <i class="fas fa-trash-alt mr-1"></i>
+                      Supprimer
+                    </button>
+                  </form>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

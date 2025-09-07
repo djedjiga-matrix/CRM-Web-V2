@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="max-w-3xl mx-auto px-4 py-8">
+    <!-- Carte principale -->
+    <div class="bg-white dark:bg-dark-800 rounded-xl shadow-xl overflow-hidden transition-all duration-300 hover:shadow-2xl">
+        <!-- En-tête -->
+        <div class="bg-gradient-to-r from-primary to-secondary p-6">
+            <h2 class="text-2xl font-bold text-white flex items-center justify-center">
+                <i class="fas fa-user-cog mr-3"></i>
+                Modifier un agent
+            </h2>
+        </div>
+
+        <!-- Formulaire -->
+        <form method="post" enctype="multipart/form-data" autocomplete="off" class="p-6">
+            <!-- Nom -->
+            <div class="mb-6">
+                <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
+                    Nom complet
+                </label>
+                <input name="NOM" value="{{ agent[1] }}" required
+                    class="w-full px-4 py-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700 focus:ring-2 focus:ring-primary/50 focus:border-transparent text-gray-900 dark:text-white">
+            </div>
+
+            <!-- Email -->
+            <div class="mb-6">
+                <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
+                    Adresse email
+                </label>
+                <input name="LOGIN" type="email" value="{{ agent[2] }}" required
+                    class="w-full px-4 py-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700 focus:ring-2 focus:ring-primary/50 focus:border-transparent text-gray-900 dark:text-white">
+            </div>
+
+            <!-- Mot de passe -->
+            <div class="mb-6">
+                <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
+                    Nouveau mot de passe <span class="text-sm text-gray-500 dark:text-gray-400">(laisser vide pour ne pas changer)</span>
+                </label>
+                <input name="MDP" type="password"
+                    class="w-full px-4 py-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700 focus:ring-2 focus:ring-primary/50 focus:border-transparent text-gray-900 dark:text-white">
+            </div>
+
+            <!-- Rôle et Campagne -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <!-- Rôle -->
+                <div>
+                    <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
+                        Rôle
+                    </label>
+                    <select name="ROLE" required
+                        class="w-full px-4 py-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700 focus:ring-2 focus:ring-primary/50 focus:border-transparent text-gray-900 dark:text-white">
+                        <option value="agent" {% if agent[3]=='agent' %}selected{% endif %}>Agent</option>
+                        <option value="admin" {% if agent[3]=='admin' %}selected{% endif %}>Administrateur</option>
+                        <option value="superviseur" {% if agent[3]=='superviseur' %}selected{% endif %}>Superviseur</option>
+                    </select>
+                </div>
+
+                <!-- Campagne -->
+                <div>
+                    <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
+                        Campagne
+                    </label>
+                    <select name="CAMPAGNE_ID" required
+                        class="w-full px-4 py-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700 focus:ring-2 focus:ring-primary/50 focus:border-transparent text-gray-900 dark:text-white">
+                        {% for campagne in campagnes %}
+                            <option value="{{ campagne[0] }}" {% if agent[4]==campagne[0] %}selected{% endif %}>{{ campagne[1] }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+
+            <!-- Photo de profil -->
+            <div class="mb-8">
+                <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
+                    Photo de profil
+                </label>
+                
+                <div class="flex items-center space-x-6">
+                    <!-- Prévisualisation -->
+                    <div class="relative">
+                        {% if agent and agent[5] %}
+                            <img src="{{ url_for('static', filename='uploads/' ~ agent[5]) }}" 
+                                alt="Photo de profil" 
+                                class="w-24 h-24 rounded-full border-4 border-primary/20 object-cover shadow-md">
+                        {% else %}
+                            <div class="w-24 h-24 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center border-4 border-primary/20">
+                                <i class="fas fa-user text-3xl text-gray-400"></i>
+                            </div>
+                        {% endif %}
+                        <div class="absolute -bottom-2 -right-2 bg-white dark:bg-dark-700 rounded-full p-1 shadow-md">
+                            <i class="fas fa-camera text-primary"></i>
+                        </div>
+                    </div>
+                    
+                    <!-- Upload -->
+                    <div class="flex-1">
+                        <input type="file" name="photo" accept="image/*" 
+                            class="block w-full text-sm text-gray-500 dark:text-gray-400
+                                file:mr-4 file:py-2 file:px-4
+                                file:rounded-lg file:border-0
+                                file:text-sm file:font-medium
+                                file:bg-primary file:text-white
+                                hover:file:bg-primary/90
+                                transition-colors">
+                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                            PNG, JPG, JPEG (max 2MB)
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Boutons -->
+            <div class="flex flex-col sm:flex-row justify-center gap-4 mt-8">
+                <button type="submit"
+                    class="px-6 py-3 bg-gradient-to-r from-primary to-secondary hover:from-primary/90 hover:to-secondary/90 text-white font-semibold rounded-lg shadow-md transition-all duration-300 transform hover:-translate-y-0.5 flex items-center justify-center">
+                    <i class="fas fa-save mr-2"></i>
+                    Enregistrer les modifications
+                </button>
+                
+                <a href="{{ url_for('parametres') }}"
+                    class="px-6 py-3 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 font-semibold rounded-lg shadow-md transition-colors duration-300 flex items-center justify-center">
+                    <i class="fas fa-times mr-2"></i>
+                    Annuler
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
