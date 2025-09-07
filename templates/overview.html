@@ -1,0 +1,346 @@
+{% extends "base.html" %}
+{% block header_title %}Vue d'ensemble{% endblock %}
+{% block content %}
+
+<div class="max-w-7xl mx-auto px-4 py-8">
+  <!-- Filtres -->
+  <div class="bg-white dark:bg-dark-800 rounded-2xl shadow-xl p-6 mb-8 transition-all duration-300">
+    <h2 class="text-xl font-bold text-gray-800 dark:text-gray-200 mb-4 flex items-center">
+      <i class="fas fa-filter mr-2 text-primary"></i>
+      Filtres de données
+    </h2>
+    
+    <form method="get" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4 items-end">
+      <!-- Date de début -->
+      <div>
+        <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
+          Date de début
+        </label>
+        <input type="date" name="date_debut" value="{{ date_debut }}"
+               class="w-full px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700 focus:ring-2 focus:ring-primary/50 focus:border-transparent text-gray-900 dark:text-white">
+      </div>
+      
+      <!-- Date de fin -->
+      <div>
+        <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
+          Date de fin
+        </label>
+        <input type="date" name="date_fin" value="{{ date_fin }}"
+               class="w-full px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700 focus:ring-2 focus:ring-primary/50 focus:border-transparent text-gray-900 dark:text-white">
+      </div>
+      
+      <!-- Agent SFR -->
+      <div>
+        <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
+          Agent SFR
+        </label>
+        <select name="agent_sfr"
+                class="w-full px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700 focus:ring-2 focus:ring-primary/50 focus:border-transparent text-gray-900 dark:text-white">
+          <option value="">Tous</option>
+          {% for ag in agents_sfr %}
+          <option value="{{ ag }}" {% if agent_sfr == ag %}selected{% endif %}>{{ ag }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      
+      <!-- Agent VALANDRE -->
+      <div>
+        <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
+          Agent VALANDRE
+        </label>
+        <select name="agent_valandre"
+                class="w-full px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700 focus:ring-2 focus:ring-primary/50 focus:border-transparent text-gray-900 dark:text-white">
+          <option value="">Tous</option>
+          {% for ag in agents_valandre %}
+          <option value="{{ ag }}" {% if agent_valandre == ag %}selected{% endif %}>{{ ag }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      
+      <!-- Boutons -->
+      <div class="flex space-x-3">
+        <button type="submit"
+                class="px-4 py-2 bg-gradient-to-r from-primary to-secondary hover:from-primary/90 hover:to-secondary/90 text-white font-semibold rounded-lg shadow-md transition-all duration-300 flex-1 flex items-center justify-center">
+          <i class="fas fa-search mr-2"></i>
+          Filtrer
+        </button>
+        
+        <a href="{{ url_for('overview') }}"
+           class="px-4 py-2 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 font-semibold rounded-lg shadow-md transition-colors duration-300 flex items-center justify-center">
+          <i class="fas fa-redo mr-2"></i>
+        </a>
+      </div>
+    </form>
+  </div>
+  
+  <!-- Section SFR -->
+  <div class="bg-gradient-to-r from-blue-500/10 to-indigo-500/10 dark:from-blue-900/30 dark:to-indigo-900/30 rounded-2xl shadow-xl p-6 mb-8 transition-all duration-300 hover:shadow-2xl">
+    <div class="flex items-center justify-between mb-6">
+      <h2 class="text-2xl font-bold text-primary dark:text-blue-300 flex items-center">
+        <i class="fas fa-chart-line mr-3"></i>
+        Vue d'ensemble Équipe SFR
+      </h2>
+      <span class="bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200 px-3 py-1 rounded-full text-sm font-medium">
+        {{ auj }}
+      </span>
+    </div>
+    
+    <!-- Cartes stats -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+      <div class="bg-white dark:bg-dark-800 rounded-xl shadow-md p-5 transition-all duration-300 hover:shadow-lg">
+        <div class="flex items-center">
+          <div class="w-12 h-12 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center mr-4">
+            <i class="fas fa-check-circle text-green-600 dark:text-green-400 text-xl"></i>
+          </div>
+          <div>
+            <p class="text-sm text-gray-500 dark:text-gray-400">Clients validés</p>
+            <p class="text-3xl font-bold text-green-600 dark:text-green-400">{{ sfr_valide }}</p>
+          </div>
+        </div>
+      </div>
+      
+      <div class="bg-white dark:bg-dark-800 rounded-xl shadow-md p-5 transition-all duration-300 hover:shadow-lg">
+        <div class="flex items-center">
+          <div class="w-12 h-12 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center mr-4">
+            <i class="fas fa-times-circle text-red-600 dark:text-red-400 text-xl"></i>
+          </div>
+          <div>
+            <p class="text-sm text-gray-500 dark:text-gray-400">Clients non validés</p>
+            <p class="text-3xl font-bold text-red-600 dark:text-red-400">{{ sfr_non_valide }}</p>
+          </div>
+        </div>
+      </div>
+      
+      <div class="bg-white dark:bg-dark-800 rounded-xl shadow-md p-5 transition-all duration-300 hover:shadow-lg">
+        <div class="flex items-center">
+          <div class="w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center mr-4">
+            <i class="fas fa-users text-blue-600 dark:text-blue-400 text-xl"></i>
+          </div>
+          <div>
+            <p class="text-sm text-gray-500 dark:text-gray-400">Total clients du jour</p>
+            <p class="text-3xl font-bold text-blue-600 dark:text-blue-400">{{ sfr_par_heure|map(attribute=1)|sum }}</p>
+            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
+              <i class="fas fa-calculator mr-1"></i>
+              Moyenne/h : {{ (sfr_par_heure|map(attribute=1)|sum // (sfr_par_heure|length or 1)) or 0 }}
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Graphique -->
+    <div class="bg-white dark:bg-dark-800 rounded-xl shadow-md p-4">
+      <canvas id="chartSfr"></canvas>
+    </div>
+  </div>
+  
+  <!-- Section VALANDRE -->
+  <div class="bg-gradient-to-r from-amber-500/10 to-orange-500/10 dark:from-amber-900/30 dark:to-orange-900/30 rounded-2xl shadow-xl p-6 transition-all duration-300 hover:shadow-2xl">
+    <div class="flex items-center justify-between mb-6">
+      <h2 class="text-2xl font-bold text-amber-600 dark:text-amber-300 flex items-center">
+        <i class="fas fa-chart-pie mr-3"></i>
+        Vue d'ensemble Équipe VALANDRE
+      </h2>
+      <span class="bg-amber-100 dark:bg-amber-900/50 text-amber-800 dark:text-amber-200 px-3 py-1 rounded-full text-sm font-medium">
+        {{ auj }}
+      </span>
+    </div>
+    
+    <!-- Cartes stats -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+      <div class="bg-white dark:bg-dark-800 rounded-xl shadow-md p-5 transition-all duration-300 hover:shadow-lg">
+        <div class="flex items-center">
+          <div class="w-12 h-12 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center mr-4">
+            <i class="fas fa-check-circle text-green-600 dark:text-green-400 text-xl"></i>
+          </div>
+          <div>
+            <p class="text-sm text-gray-500 dark:text-gray-400">Clients validés</p>
+            <p class="text-3xl font-bold text-green-600 dark:text-green-400">{{ valandre_valide }}</p>
+          </div>
+        </div>
+      </div>
+      
+      <div class="bg-white dark:bg-dark-800 rounded-xl shadow-md p-5 transition-all duration-300 hover:shadow-lg">
+        <div class="flex items-center">
+          <div class="w-12 h-12 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center mr-4">
+            <i class="fas fa-times-circle text-red-600 dark:text-red-400 text-xl"></i>
+          </div>
+          <div>
+            <p class="text-sm text-gray-500 dark:text-gray-400">Clients non validés</p>
+            <p class="text-3xl font-bold text-red-600 dark:text-red-400">{{ valandre_non_valide }}</p>
+          </div>
+        </div>
+      </div>
+      
+      <div class="bg-white dark:bg-dark-800 rounded-xl shadow-md p-5 transition-all duration-300 hover:shadow-lg">
+        <div class="flex items-center">
+          <div class="w-12 h-12 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center mr-4">
+            <i class="fas fa-users text-amber-600 dark:text-amber-400 text-xl"></i>
+          </div>
+          <div>
+            <p class="text-sm text-gray-500 dark:text-gray-400">Total clients du jour</p>
+            <p class="text-3xl font-bold text-amber-600 dark:text-amber-400">{{ valandre_par_heure|map(attribute=1)|sum }}</p>
+            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
+              <i class="fas fa-calculator mr-1"></i>
+              Moyenne/h : {{ (valandre_par_heure|map(attribute=1)|sum // (valandre_par_heure|length or 1)) or 0 }}
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Graphique -->
+    <div class="bg-white dark:bg-dark-800 rounded-xl shadow-md p-4">
+      <canvas id="chartValandre"></canvas>
+    </div>
+  </div>
+</div>
+
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+function makeData(agentParHeure) {
+  // Format [{agent, heure, count}, ...]
+  let series = {};
+  agentParHeure.forEach(([agent, heure, nb]) => {
+    if (!series[agent]) series[agent] = {};
+    series[agent][heure] = nb;
+  });
+
+  let agents = Object.keys(series);
+  let heures = Array.from({length: 24}, (_, h) => h.toString().padStart(2, '0'));
+  
+  // Générer des couleurs uniques pour chaque agent
+  const colorPalette = [
+    '#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6',
+    '#EC4899', '#06B6D4', '#F97316', '#84CC16', '#6366F1'
+  ];
+  
+  let datasets = agents.map((agent, index) => ({
+    label: agent,
+    data: heures.map(h => series[agent][h] || 0),
+    borderWidth: 2,
+    backgroundColor: `${colorPalette[index % colorPalette.length]}33`,
+    borderColor: colorPalette[index % colorPalette.length],
+    borderRadius: 6,
+    fill: false
+  }));
+
+  return {heures, datasets};
+}
+
+document.addEventListener("DOMContentLoaded", function() {
+  // Mode sombre pour les graphiques
+  const isDark = document.documentElement.classList.contains('dark');
+  Chart.defaults.color = isDark ? '#D1D5DB' : '#4B5563';
+  
+  // SFR
+  let sfrAgentParHeure = JSON.parse('{{ sfr_agent_par_heure|tojson|safe }}');
+  let sfrData = makeData(sfrAgentParHeure);
+  
+  new Chart(document.getElementById('chartSfr'), {
+    type: 'bar',
+    data: {
+      labels: sfrData.heures,
+      datasets: sfrData.datasets
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: {
+          position: 'top',
+          labels: {
+            font: {
+              size: 12
+            }
+          }
+        },
+        title: {
+          display: true,
+          text: 'Répartition par heure et par agent',
+          font: {
+            size: 16,
+            weight: 'bold'
+          }
+        }
+      },
+      scales: {
+        x: {
+          title: {
+            display: true,
+            text: 'Heure de la journée'
+          },
+          grid: {
+            color: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'
+          }
+        }, 
+        y: {
+          title: {
+            display: true,
+            text: 'Nombre de clients'
+          },
+          beginAtZero: true,
+          grid: {
+            color: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'
+          }
+        }
+      }
+    }
+  });
+  
+  // Valandre
+  let valandreAgentParHeure = JSON.parse('{{ valandre_agent_par_heure|tojson|safe }}');
+  let valandreData = makeData(valandreAgentParHeure);
+  
+  new Chart(document.getElementById('chartValandre'), {
+    type: 'bar',
+    data: {
+      labels: valandreData.heures,
+      datasets: valandreData.datasets
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: {
+          position: 'top',
+          labels: {
+            font: {
+              size: 12
+            }
+          }
+        },
+        title: {
+          display: true,
+          text: 'Répartition par heure et par agent',
+          font: {
+            size: 16,
+            weight: 'bold'
+          }
+        }
+      },
+      scales: {
+        x: {
+          title: {
+            display: true,
+            text: 'Heure de la journée'
+          },
+          grid: {
+            color: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'
+          }
+        }, 
+        y: {
+          title: {
+            display: true,
+            text: 'Nombre de clients'
+          },
+          beginAtZero: true,
+          grid: {
+            color: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'
+          }
+        }
+      }
+    }
+  });
+});
+</script>
+{% endblock %}

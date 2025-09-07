@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="fr" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <title>{% block title %}Mon CRM{% endblock %}</title>
+    <!-- Remplacement de Bootstrap par Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#2563eb',
+                        secondary: '#8b5cf6',
+                        dark: {
+                            800: '#1e293b',
+                            900: '#0f172a'
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Fonction pour basculer entre light/dark mode
+        function toggleDarkMode() {
+            const html = document.documentElement;
+            html.classList.toggle('dark');
+            localStorage.setItem('dark-mode', html.classList.contains('dark'));
+        }
+        
+        // Initialisation du dark mode selon les préférences utilisateur
+        document.addEventListener('DOMContentLoaded', function() {
+            const isDark = localStorage.getItem('dark-mode') === 'true' || 
+                          (window.matchMedia('(prefers-color-scheme: dark)').matches && 
+                          localStorage.getItem('dark-mode') !== 'false');
+            
+            if (isDark) {
+                document.documentElement.classList.add('dark');
+            }
+        });
+        
+        // Fonction pour ouvrir/fermer le menu mobile
+        function toggleMobileMenu() {
+            const menu = document.getElementById('sidebar');
+            menu.classList.toggle('hidden');
+            menu.classList.toggle('md:flex');
+        }
+    </script>
+    <style>
+        /* Styles personnalisés pour la sidebar */
+        .sidebar {
+            transition: all 0.3s ease;
+            box-shadow: 4px 0 20px rgba(19, 50, 104, 0.08);
+            border-radius: 0 24px 24px 0;
+            z-index: 1100;
+        }
+        
+        .sidebar.closed {
+            width: 5rem;
+        }
+        
+        .sidebar.closed .menu-text,
+        .sidebar.closed .sidebar-content,
+        .sidebar.closed .logo-text,
+        .sidebar.closed .sidebar-footer div {
+            opacity: 0;
+            pointer-events: none;
+            display: none;
+        }
+        
+        .nav-link {
+            transition: all 0.2s ease;
+        }
+        
+        .nav-link:hover {
+            background: rgba(37, 99, 235, 0.2);
+            color: #fff !important;
+            transform: translateX(4px);
+        }
+        
+        .nav-link.active {
+            background: rgba(37, 99, 235, 0.3) !important;
+            color: #fff !important;
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+        }
+        
+        /* Styles pour le contenu principal */
+        .card {
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            border-radius: 0.75rem;
+        }
+        
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+        }
+        
+        .dark .card:hover {
+            box-shadow: 0 10px 25px -5px rgba(255, 255, 255, 0.05);
+        }
+        
+        /* Animation pour le bouton burger */
+        .burger-icon {
+            transition: transform 0.3s ease;
+        }
+        
+        .burger-icon.active {
+            transform: rotate(90deg);
+        }
+        
+        /* Adaptation responsive */
+        @media (max-width: 768px) {
+            .sidebar {
+                position: fixed;
+                left: -100%;
+                transition: left 0.3s ease;
+            }
+            
+            .sidebar.open {
+                left: 0;
+            }
+        }
+    </style>
+</head>
+<body class="h-full bg-gray-50 dark:bg-dark-900 flex">
+    <!-- Bouton Burger pour le menu mobile -->
+    <button id="sidebar-toggle" class="fixed top-4 left-4 z-50 bg-primary text-white p-2 rounded-lg shadow-md md:hidden" 
+            onclick="toggleMobileMenu()" title="Ouvrir/Fermer le menu">
+        <i class="fas fa-bars burger-icon"></i>
+    </button>
+
+    <div class="flex min-h-screen w-full">
+        {% if session.agent_nom and request.path not in ['/login', '/logout'] %}
+        <!-- Sidebar moderne avec dark mode -->
+        <nav id="sidebar" class="sidebar hidden md:flex flex-col w-64 bg-white dark:bg-dark-800 text-gray-700 dark:text-gray-200 min-h-screen">
+            <div class="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+                <div class="flex items-center space-x-2">
+                    <i class="fas fa-headset text-primary text-2xl"></i>
+                    <span class="logo-text font-bold text-xl">QuantumCall</span>
+                </div>
+            </div>
+            
+            <div class="flex-1 overflow-y-auto py-4">
+                <nav>
+                    <div class="px-4 mb-6">
+                        <h3 class="text-xs uppercase font-semibold text-gray-500 dark:text-gray-400 mb-2">Menu Principal</h3>
+                        <ul class="space-y-1">
+                            <li>
+                                <a href="/overview" class="nav-link flex items-center space-x-3 p-2 rounded-lg {% if request.path == '/overview' %}active{% endif %}">
+                                    <i class="fas fa-chart-line w-5"></i>
+                                    <span class="menu-text">Overview</span>
+                                </a>
+                            </li>
+                            <li>
+                                <a href="/dashboard_valandre" class="nav-link flex items-center space-x-3 p-2 rounded-lg {% if request.path == '/dashboard_valandre' %}active{% endif %}">
+                                    <i class="fas fa-chart-pie w-5"></i>
+                                    <span class="menu-text">Dashboard Valandre</span>
+                                </a>
+                            </li>
+                            <li>
+                                <a href="/formulaire_valandre" class="nav-link flex items-center space-x-3 p-2 rounded-lg {% if request.path == '/formulaire_valandre' %}active{% endif %}">
+                                    <i class="fas fa-file-alt w-5"></i>
+                                    <span class="menu-text">Client Valandre</span>
+                                </a>
+                            </li>
+                            <li>
+                                <a href="/dashboard" class="nav-link flex items-center space-x-3 p-2 rounded-lg {% if request.path == '/dashboard' %}active{% endif %}">
+                                    <i class="fas fa-chart-bar w-5"></i>
+                                    <span class="menu-text">Dashboard SFR</span>
+                                </a>
+                            </li>
+                            <li>
+                                <a href="/" class="nav-link flex items-center space-x-3 p-2 rounded-lg {% if request.path == '/' %}active{% endif %}">
+                                    <i class="fas fa-user-plus w-5"></i>
+                                    <span class="menu-text">Nouveau Client SFR</span>
+                                </a>
+                            </li>
+                            
+                            {% if session.agent_role == 'admin' %}
+                            <hr class="mx-3 my-3 border-gray-200 dark:border-gray-700">
+                            <li>
+                                <a href="/classement_agents" class="nav-link flex items-center space-x-3 p-2 rounded-lg {% if request.path == '/classement_agents' %}active{% endif %}">
+                                    <i class="fas fa-trophy w-5"></i>
+                                    <span class="menu-text">Classement agents</span>
+                                </a>
+                            </li>
+                            <li>
+                                <a href="/live_agents" class="nav-link flex items-center space-x-3 p-2 rounded-lg {% if request.path == '/live_agents' %}active{% endif %}">
+                                    <i class="fas fa-desktop w-5"></i>
+                                    <span class="menu-text">Supervision LIVE</span>
+                                </a>
+                            </li>
+                            <li>
+                                <a href="/journal_presence" class="nav-link flex items-center space-x-3 p-2 rounded-lg {% if request.path == '/journal_presence' %}active{% endif %}">
+                                    <i class="fas fa-calendar-check w-5"></i>
+                                    <span class="menu-text">Journal Présence</span>
+                                </a>
+                            </li>
+                            <li>
+                                <a href="/journal" class="nav-link flex items-center space-x-3 p-2 rounded-lg {% if request.path == '/journal' %}active{% endif %}">
+                                    <i class="fas fa-history w-5"></i>
+                                    <span class="menu-text">Journal Connexions</span>
+                                </a>
+                            </li>
+                            <li>
+                                <a href="/parametres" class="nav-link flex items-center space-x-3 p-2 rounded-lg {% if request.path == '/parametres' %}active{% endif %}">
+                                    <i class="fas fa-cog w-5"></i>
+                                    <span class="menu-text">Paramètres agents</span>
+                                </a>
+                            </li>
+                            {% endif %}
+                            
+                            <hr class="mx-3 my-3 border-gray-200 dark:border-gray-700">
+                            
+                            <li>
+                                <a href="{{ url_for('profil_agent') }}" class="nav-link flex items-center space-x-3 p-2 rounded-lg {% if request.path == '/profil' %}active{% endif %}">
+                                    <i class="fas fa-user-circle w-5"></i>
+                                    <span class="menu-text">Mon profil</span>
+                                </a>
+                            </li>
+                            <li>
+                                <a href="#" class="nav-link flex items-center space-x-3 p-2 rounded-lg text-yellow-500" onclick="ouvrirPauseModal()">
+                                    <i class="fas fa-coffee w-5"></i>
+                                    <span class="menu-text">Mettre en pause</span>
+                                </a>
+                            </li>
+                            <li>
+                                <a href="{{ url_for('logout') }}" class="nav-link flex items-center space-x-3 p-2 rounded-lg text-red-500">
+                                    <i class="fas fa-sign-out-alt w-5"></i>
+                                    <span class="menu-text">Déconnexion</span>
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
+                </nav>
+            </div>
+            
+            <div class="p-4 border-t border-gray-200 dark:border-gray-700">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-3">
+                        {% if agent_photo %}
+                            <img src="{{ agent_photo }}" alt="Avatar" class="w-10 h-10 rounded-full border-2 border-primary">
+                        {% else %}
+                            <div class="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                                <i class="fas fa-user text-primary"></i>
+                            </div>
+                        {% endif %}
+                        <div class="sidebar-content">
+                            <p class="font-medium">{{ session.agent_nom }}</p>
+                            <p class="text-sm text-gray-500 dark:text-gray-400">({{ session.agent_role }})</p>
+                        </div>
+                    </div>
+                    <button onclick="toggleDarkMode()" class="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700">
+                        <i class="fas fa-moon dark:hidden"></i>
+                        <i class="fas fa-sun hidden dark:block"></i>
+                    </button>
+                </div>
+            </div>
+        </nav>
+        {% endif %}
+
+        <!-- Contenu principal -->
+        <main class="flex-1 overflow-auto">
+            <!-- Barre de navigation supérieure -->
+            {% if session.agent_nom and request.path not in ['/login', '/logout'] %}
+            <header class="bg-white dark:bg-dark-800 shadow-sm">
+                <div class="flex items-center justify-between p-4">
+                    <div class="flex items-center">
+                        <button onclick="toggleMobileMenu()" class="md:hidden mr-4 text-gray-500">
+                            <i class="fas fa-bars"></i>
+                        </button>
+                        <h1 class="text-xl font-semibold">{% block header_title %}Tableau de bord{% endblock %}</h1>
+                    </div>
+                    
+                    <div class="flex items-center space-x-4">
+                        <div class="relative">
+                            <button class="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700">
+                                <i class="fas fa-bell"></i>
+                            </button>
+                            <span class="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+                        </div>
+                        <div class="relative hidden md:block">
+                            <input type="text" placeholder="Rechercher..." class="pl-10 pr-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-primary/50">
+                            <i class="fas fa-search absolute left-3 top-3 text-gray-400"></i>
+                        </div>
+                    </div>
+                </div>
+            </header>
+            {% endif %}
+            
+            <!-- Section principale -->
+            <div class="p-6">
+                {% block content %}{% endblock %}
+            </div>
+        </main>
+    </div>
+
+    <!-- MODAL : Mettre en pause (nouvelle version adaptée) -->
+    <div id="pause-modal" class="fixed z-50 inset-0 overflow-y-auto hidden" aria-modal="true" role="dialog">
+        <div class="flex items-center justify-center min-h-screen px-4 py-12">
+            <div class="fixed inset-0 bg-black bg-opacity-50 transition-opacity" onclick="fermerPauseModal()"></div>
+            <div class="relative bg-white dark:bg-dark-800 rounded-xl shadow-xl max-w-md w-full z-10 p-6">
+                <!-- Bouton fermer X corrigé -->
+                <button type="button" onclick="fermerPauseModal()" aria-label="Fermer"
+                    class="absolute top-3 right-3 text-gray-400 hover:text-gray-700 dark:hover:text-white text-2xl leading-none">
+                    &times;
+                </button>
+                <h3 class="text-lg font-bold mb-4 text-gray-800 dark:text-white">Mettre en pause</h3>
+                <form id="pauseForm" method="post" action="">
+                    <div class="mb-4">
+                        <label class="block font-medium mb-2">Type de pause</label>
+                        <select name="type_pause" id="type_pause" class="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-primary/50" required>
+                            <option value="">-- Choisir --</option>
+                            <option value="Pause café">Pause café</option>
+                            <option value="Pause déjeuner">Pause déjeuner</option>
+                            <option value="Réunion">Réunion</option>
+                            <option value="Autre">Autre</option>
+                            <option value="Disponible">Disponible</option>
+                            <option value="En communication">En communication</option>
+                        </select>
+                    </div>
+                    <div id="pause_timer" class="text-center font-bold text-lg mb-4 hidden">
+                        Temps de pause: 00:00
+                    </div>
+                    <div class="flex justify-between">
+                        <button id="demarrerPauseBtn" type="submit" class="px-4 py-2 rounded-lg bg-yellow-500 text-white hover:bg-yellow-600">Démarrer</button>
+                        <button id="finPauseBtn" type="button" class="px-4 py-2 rounded-lg bg-gray-500 text-white hover:bg-gray-600 hidden">Terminer</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    function ouvrirPauseModal() {
+        document.getElementById('pause-modal').classList.remove('hidden');
+    }
+    function fermerPauseModal() {
+        document.getElementById('pause-modal').classList.add('hidden');
+    }
+    </script>
+
+    <!-- Scripts nécessaires -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="//cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
+    <script>
+    // Fonction pour mettre à jour la sidebar
+    function updateSidebarDisplay() {
+        const sidebar = document.getElementById('sidebar');
+        const sidebarToggle = document.getElementById('sidebar-toggle');
+        const burgerIcon = document.querySelector('.burger-icon');
+        
+        if (window.innerWidth < 768) {
+            // Mobile
+            if (sidebar && sidebar.classList.contains('open')) {
+                sidebar.classList.remove('hidden');
+                sidebar.classList.add('flex', 'fixed', 'left-0', 'top-0', 'bottom-0', 'z-40');
+                burgerIcon.classList.add('active');
+            } else {
+                sidebar.classList.add('hidden');
+                sidebar.classList.remove('open', 'flex');
+                burgerIcon.classList.remove('active');
+            }
+        } else {
+            // Desktop
+            sidebar.classList.remove('hidden', 'fixed');
+            sidebar.classList.add('md:flex');
+            burgerIcon.classList.remove('active');
+        }
+    }
+
+    // Toggle pour la sidebar mobile
+    function toggleMobileMenu() {
+        const sidebar = document.getElementById('sidebar');
+        const burgerIcon = document.querySelector('.burger-icon');
+        
+        if (window.innerWidth < 768) {
+            sidebar.classList.toggle('open');
+            burgerIcon.classList.toggle('active');
+        }
+        
+        updateSidebarDisplay();
+    }
+
+    // Initialisation et gestion des événements
+    document.addEventListener('DOMContentLoaded', function() {
+        updateSidebarDisplay();
+        
+        // Fermer la sidebar mobile en cliquant à l'extérieur
+        document.addEventListener('click', function(e) {
+            const sidebar = document.getElementById('sidebar');
+            const toggleBtn = document.getElementById('sidebar-toggle');
+            
+            if (window.innerWidth < 768 && sidebar && sidebar.classList.contains('open') && 
+                !sidebar.contains(e.target) && e.target !== toggleBtn) {
+                sidebar.classList.remove('open');
+                updateSidebarDisplay();
+            }
+        });
+        
+        // Gestion du timer de pause
+        let pauseInterval = null;
+        let pauseSeconds = 0;
+        
+        document.getElementById("pauseForm").onsubmit = function(e) {
+            e.preventDefault();
+            document.getElementById("demarrerPauseBtn").classList.add('hidden');
+            document.getElementById("finPauseBtn").classList.remove('hidden');
+            document.getElementById("pause_timer").classList.remove('hidden');
+            pauseSeconds = 0;
+            updatePauseTimer();
+            pauseInterval = setInterval(() => {
+                pauseSeconds++;
+                updatePauseTimer();
+            }, 1000);
+        };
+        
+        document.getElementById("finPauseBtn").onclick = function() {
+            clearInterval(pauseInterval);
+            document.getElementById("demarrerPauseBtn").classList.remove('hidden');
+            document.getElementById("finPauseBtn").classList.add('hidden');
+            document.getElementById("pause_timer").classList.add('hidden');
+            
+            // Fermer le modal
+            const modal = bootstrap.Modal.getInstance(document.getElementById('pauseModal'));
+            modal.hide();
+        };
+        
+        function updatePauseTimer() {
+            let min = Math.floor(pauseSeconds / 60).toString().padStart(2, '0');
+            let sec = (pauseSeconds % 60).toString().padStart(2, '0');
+            document.getElementById("pause_timer").textContent = `Temps de pause: ${min}:${sec}`;
+        }
+        
+        // Déconnexion auto après 5min d'inactivité
+        const INACTIVITE_MAX = 300; // 5 minutes
+        let dernierAction = Date.now();
+        
+        function resetInactivite() {
+            dernierAction = Date.now();
+        }
+        
+        ["click", "mousemove", "keydown", "scroll"].forEach(evt => {
+            window.addEventListener(evt, resetInactivite);
+        });
+        
+        setInterval(() => {
+            if (pauseInterval) return; // Ne déconnecte pas si en pause
+            
+            if ((Date.now() - dernierAction) > INACTIVITE_MAX * 1000) {
+                alert("Déconnexion automatique pour inactivité (5 minutes)");
+                window.location = "{{ url_for('logout') }}";
+            }
+        }, 10000);
+        
+        // Socket.io alert (exemple)
+        var socket = io();
+        socket.on('nouveau_client', function(data) {
+            alert(data.message);
+        });
+    });
+
+    // Gestion du redimensionnement de la fenêtre
+    window.addEventListener('resize', updateSidebarDisplay);
+    </script>
+    <script>
+        setInterval(function() {
+            fetch('/is_logged_in').then(resp => {
+                if (resp.status === 401) {
+                    window.location.href = "/login";
+                }
+            });
+        }, 30000); // Toutes les 30 secondes
+    </script>
+
+    <!-- Toastify JS & CSS -->
+    <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
+    
+    <!-- Script qui affiche les flashs Flask sous forme de Toasts -->
+    <script>
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    Toastify({
+                        text: {{ message|tojson }},
+                        duration: 5000,
+                        gravity: "top",
+                        position: "right",
+                        backgroundColor: "{% if category == 'success' %}#22c55e{% elif category == 'danger' %}#ef4444{% elif category == 'warning' %}#f59e42{% else %}#2563eb{% endif %}",
+                        close: true,
+                        stopOnFocus: true
+                    }).showToast();
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+    </script>    
+   {% if session.agent_nom %}
+   <!-- Fenêtre flottante du chat -->
+   <div id="chat-widget" style="position:fixed;bottom:24px;right:24px;z-index:9999;">
+       <div id="chat-header" style="background:#4f46e5;color:white;padding:10px 16px;cursor:pointer;border-radius:12px 12px 0 0;font-weight:bold;">
+           💬 Chat équipe
+           <span id="chat-close" style="float:right;cursor:pointer;font-size:20px;font-weight:normal;">&times;</span>
+       </div>
+       <div id="chat-body" style="width:330px;height:320px;background:#fff;border:1px solid #4f46e5;border-radius:0 0 12px 12px;display:flex;flex-direction:column;">
+           <div id="chat-messages" style="flex:1;overflow-y:auto;padding:12px 10px;"></div>
+           <form id="chat-form" style="display:flex;border-top:1px solid #e5e7eb;">
+               <input id="chat-input" type="text" placeholder="Écris un message..." style="flex:1;padding:8px;border:none;outline:none;">
+               <button type="submit" style="background:#4f46e5;color:white;padding:0 18px;border:none;outline:none;border-radius:0 0 12px 0;font-size:20px;">➤</button>
+           </form>
+       </div>
+   </div>
+   
+   <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.4/socket.io.min.js"></script>
+   <script>
+   document.addEventListener('DOMContentLoaded', function() {
+       var socket = io();
+   
+       // Affiche/Masque le chat
+       var chatWidget = document.getElementById('chat-widget');
+       var chatHeader = document.getElementById('chat-header');
+       var chatBody = document.getElementById('chat-body');
+       var chatClose = document.getElementById('chat-close');
+       var chatOpen = false;
+        chatBody.style.display = 'none'; // Cacher le chat au démarrage
+
+       chatHeader.onclick = function() {
+           chatBody.style.display = chatOpen ? 'none' : 'flex';
+           chatOpen = !chatOpen;
+       };
+       chatClose.onclick = function(e) {
+           e.stopPropagation();
+           chatBody.style.display = 'none';
+           chatOpen = false;
+       };
+   
+       // Envoi du message
+       var chatForm = document.getElementById('chat-form');
+       var chatInput = document.getElementById('chat-input');
+       var chatMessages = document.getElementById('chat-messages');
+   
+       chatForm.onsubmit = function(e) {
+           e.preventDefault();
+           var msg = chatInput.value.trim();
+           if(msg.length > 0) {
+               socket.emit('chat_message', {user: "{{ session.agent_nom }}", message: msg});
+               chatInput.value = '';
+           }
+       };
+   
+       // Affiche les messages reçus
+       socket.on('chat_message', function(data) {
+           var div = document.createElement('div');
+           div.innerHTML = '<b>' + data.user + ':</b> ' + data.message;
+           chatMessages.appendChild(div);
+           chatMessages.scrollTop = chatMessages.scrollHeight;
+       });
+   
+       // Historique au chargement (optionnel)
+       socket.on('chat_history', function(history) {
+           chatMessages.innerHTML = "";
+           history.forEach(function(data){
+               var div = document.createElement('div');
+               div.innerHTML = '<b>' + data.user + ':</b> ' + data.message;
+               chatMessages.appendChild(div);
+           });
+           chatMessages.scrollTop = chatMessages.scrollHeight;
+       });
+   
+       // On demande l'historique à l'ouverture
+       socket.emit('chat_history_request');
+   });
+   </script>
+   {% endif %}
+   
+
+</body>
+</html>

@@ -1,0 +1,202 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="max-w-6xl mx-auto px-4 py-8">
+    <!-- Carte principale -->
+    <div class="bg-white dark:bg-dark-800 rounded-2xl shadow-xl overflow-hidden transition-all duration-300 hover:shadow-2xl">
+        <!-- En-tête avec dégradé -->
+        <div class="bg-gradient-to-r from-primary to-secondary p-6">
+            <h1 class="text-2xl md:text-3xl font-bold text-white flex items-center justify-center">
+                <i class="fas fa-user-edit mr-3"></i>
+                Modifier le client VALANDRE
+            </h1>
+        </div>
+        
+        <!-- Formulaire -->
+        <form method="POST" autocomplete="off" class="p-6">
+            <!-- Informations générales -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+                <!-- Date de signature -->
+                <div>
+                    <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
+                        Date de signature
+                    </label>
+                    <input type="date" name="DATE_SIGNATURE" value="{{ client.DATE_SIGNATURE }}" required
+                        class="w-full px-4 py-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700 focus:ring-2 focus:ring-primary/50 focus:border-transparent text-gray-900 dark:text-white">
+                </div>
+                
+                <!-- Nom vendeur -->
+                <div>
+                    <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
+                        Nom vendeur
+                    </label>
+                    <input type="text" name="NOM_VENDEUR" value="{{ client.NOM_VENDEUR }}" required
+                        class="w-full px-4 py-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700 focus:ring-2 focus:ring-primary/50 focus:border-transparent text-gray-900 dark:text-white">
+                </div>
+                
+                <!-- Prénom vendeur -->
+                <div>
+                    <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
+                        Prénom vendeur
+                    </label>
+                    <input type="text" name="PRENOM_VENDEUR" value="{{ client.PRENOM_VENDEUR }}" required
+                        class="w-full px-4 py-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700 focus:ring-2 focus:ring-primary/50 focus:border-transparent text-gray-900 dark:text-white">
+                </div>
+                
+                <!-- Titre -->
+                <div>
+                    <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
+                        Titre
+                    </label>
+                    <input type="text" name="TITRE" value="{{ client.TITRE }}"
+                        class="w-full px-4 py-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700 focus:ring-2 focus:ring-primary/50 focus:border-transparent text-gray-900 dark:text-white">
+                </div>
+            </div>
+            
+            <!-- Informations client -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+                <!-- Nom client -->
+                <div>
+                    <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
+                        Nom client
+                    </label>
+                    <input type="text" name="NOM_CLIENT" value="{{ client.NOM_CLIENT }}" required
+                        class="w-full px-4 py-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700 focus:ring-2 focus:ring-primary/50 focus:border-transparent text-gray-900 dark:text-white">
+                </div>
+                
+                <!-- Prénom client -->
+                <div>
+                    <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
+                        Prénom client
+                    </label>
+                    <input type="text" name="PRENOM_CLIENT" value="{{ client.PRENOM_CLIENT }}" required
+                        class="w-full px-4 py-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700 focus:ring-2 focus:ring-primary/50 focus:border-transparent text-gray-900 dark:text-white">
+                </div>
+                
+                <!-- Téléphone -->
+                <div>
+                    <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
+                        Téléphone
+                    </label>
+                    <input type="text" name="TELEPHONE" value="{{ client.TELEPHONE }}" required
+                        class="w-full px-4 py-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700 focus:ring-2 focus:ring-primary/50 focus:border-transparent text-gray-900 dark:text-white">
+                </div>
+                
+                <!-- Agent -->
+                <div>
+                    <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
+                        Agent
+                    </label>
+                    <select name="AGENT" required
+                        class="w-full px-4 py-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700 focus:ring-2 focus:ring-primary/50 focus:border-transparent text-gray-900 dark:text-white">
+                        {% for ag in agents %}
+                            <option value="{{ ag }}" {% if ag == client.AGENT %}selected{% endif %}>{{ ag }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            
+            <!-- Extranet -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                <div>
+                    <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
+                        Extranet
+                    </label>
+                    <select name="EXTRANET"
+                        class="w-full px-4 py-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700 focus:ring-2 focus:ring-primary/50 focus:border-transparent text-gray-900 dark:text-white">
+                        <option value="" {% if client.EXTRANET == '' %}selected{% endif %}></option>
+                        <option value="OMAYA" {% if client.EXTRANET == 'OMAYA' %}selected{% endif %}>OMAYA</option>
+                        <option value="AUTRE" {% if client.EXTRANET == 'AUTRE' %}selected{% endif %}>AUTRE</option>
+                    </select>
+                </div>
+            </div>
+            
+            <!-- Section Produits -->
+            <div class="mb-8">
+                <div class="flex items-center mb-6">
+                    <div class="h-px flex-1 bg-gray-200 dark:bg-gray-700"></div>
+                    <h2 class="px-4 text-xl font-bold text-primary dark:text-secondary flex items-center">
+                        <i class="fas fa-boxes mr-2"></i>
+                        Produits
+                    </h2>
+                    <div class="h-px flex-1 bg-gray-200 dark:bg-gray-700"></div>
+                </div>
+                
+                <div class="space-y-4">
+                    {% set produits = [
+                        ('STRATO', 'Strato'),
+                        ('LSR', 'LSR'),
+                        ('PRESSE', 'Presse'),
+                        ('ENI', 'ENI'),
+                        ('SERENITY', 'Serenity'),
+                        ('PROTEC_ALLIANCE', 'Protec Alliance'),
+                        ('WEKIWI', 'Wekiwi')
+                    ] %}
+                    
+                    {% for code, label in produits %}
+                    <div class="p-5 border border-gray-200 dark:border-gray-700 rounded-xl bg-gray-50 dark:bg-gray-700/30 shadow-sm transition-all duration-200 hover:shadow-md">
+                        <div class="flex items-center mb-3">
+                            <div class="w-8 h-8 rounded-full bg-primary/10 dark:bg-secondary/20 flex items-center justify-center mr-3">
+                                <i class="fas fa-box text-primary dark:text-secondary"></i>
+                            </div>
+                            <h3 class="font-semibold text-lg text-gray-800 dark:text-gray-200">{{ label }}</h3>
+                        </div>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
+                            <!-- Numéro de contrat -->
+                            <div class="md:col-span-4">
+                                <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
+                                    N° Contrat/Réf
+                                </label>
+                                <input type="text" name="{{ code }}_NUM" placeholder="N° Contrat/Réf" 
+                                    value="{{ client[code+'_NUM'] }}"
+                                    class="w-full px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 focus:ring-2 focus:ring-primary/50 focus:border-transparent text-gray-900 dark:text-white">
+                            </div>
+                            
+                            <!-- Statut -->
+                            <div class="md:col-span-3">
+                                <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
+                                    Statut
+                                </label>
+                                <select name="{{ code }}_STATUT"
+                                    class="w-full px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 focus:ring-2 focus:ring-primary/50 focus:border-transparent text-gray-900 dark:text-white">
+                                    <option value="" {% if client[code+'_STATUT']=='' %}selected{% endif %}></option>
+                                    <option value="VALIDÉ" {% if client[code+'_STATUT']=='VALIDÉ' %}selected{% endif %}>VALIDÉ</option>
+                                    <option value="REFUSÉ" {% if client[code+'_STATUT']=='REFUSÉ' %}selected{% endif %}>REFUSÉ</option>
+                                </select>
+                            </div>
+                            
+                            <!-- Remarque -->
+                            <div class="md:col-span-5">
+                                <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
+                                    Remarque
+                                </label>
+                                <input type="text" name="{{ code }}_REMARQUE" 
+                                    value="{{ client[code+'_REMARQUE'] }}"
+                                    class="w-full px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 focus:ring-2 focus:ring-primary/50 focus:border-transparent text-gray-900 dark:text-white">
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            
+            <!-- Boutons d'action -->
+            <div class="flex flex-col sm:flex-row justify-center gap-6 mt-10">
+                <button type="submit"
+                    class="px-8 py-3 bg-gradient-to-r from-primary to-secondary hover:from-primary/90 hover:to-secondary/90 text-white font-semibold rounded-xl shadow-md transition-all duration-300 transform hover:-translate-y-0.5 flex items-center justify-center">
+                    <i class="fas fa-save mr-2"></i>
+                    Enregistrer les modifications
+                </button>
+                
+                <a href="{{ url_for('dashboard_valandre') }}"
+                    class="px-8 py-3 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 font-semibold rounded-xl shadow-md transition-colors duration-300 flex items-center justify-center">
+                    <i class="fas fa-times mr-2"></i>
+                    Annuler
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% endblock %}

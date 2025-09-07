@@ -1,0 +1,247 @@
+{% extends "base.html" %}
+{% block title %}Journal des Connexions{% endblock %}
+{% block header_title %}Journal des Connexions des Agents{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto px-4 sm:px-6 py-6">
+    <div class="card bg-white dark:bg-dark-800 rounded-xl shadow-sm p-8 border border-gray-100 dark:border-gray-700">
+        <!-- En-tête -->
+        <div class="text-center mb-8">
+            <div class="w-16 h-16 mx-auto rounded-full bg-blue-100 dark:bg-blue-900/20 flex items-center justify-center">
+                <i class="fas fa-history text-blue-600 dark:text-blue-400 text-2xl"></i>
+            </div>
+            <h1 class="text-2xl font-bold text-gray-800 dark:text-white mt-4">
+                Journal des Connexions
+            </h1>
+            <p class="text-gray-600 dark:text-gray-300 mt-2">
+                Historique des activités des agents sur la plateforme
+            </p>
+        </div>
+
+        <!-- Filtres -->
+        <div class="card bg-white dark:bg-dark-800 rounded-xl shadow-sm p-6 border border-gray-100 dark:border-gray-700 mb-8">
+            <h2 class="text-lg font-bold mb-4 text-gray-800 dark:text-white">Filtrer les données</h2>
+            
+            <form method="get" class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div class="md:col-span-1">
+                    <label class="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">Agent</label>
+                    <select name="agent" class="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-primary/50">
+                        <option value="">Tous les agents</option>
+                        {% for ag in agents %}
+                        <option value="{{ ag }}" {% if request.args.get('agent') == ag %}selected{% endif %}>{{ ag }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">Date début</label>
+                    <input type="date" name="date_debut" class="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-primary/50"
+                           value="{{ request.args.get('date_debut', '') }}">
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">Date fin</label>
+                    <input type="date" name="date_fin" class="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-primary/50"
+                           value="{{ request.args.get('date_fin', '') }}">
+                </div>
+                
+                <div class="flex items-end gap-2">
+                    <button type="submit" class="w-full px-4 py-2 rounded-lg bg-primary hover:bg-primary/90 text-white">
+                        <i class="fas fa-search mr-2"></i> Filtrer
+                    </button>
+                    <a href="{{ url_for('journal') }}" class="px-4 py-2 rounded-lg bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-800 dark:text-white">
+                        <i class="fas fa-sync-alt"></i>
+                    </a>
+                </div>
+            </form>
+        </div>
+
+        <!-- Actions -->
+        <div class="flex justify-center mb-8">
+            <a href="{{ url_for('export_journal',
+                agent=request.args.get('agent', ''),
+                date_debut=request.args.get('date_debut', ''),
+                date_fin=request.args.get('date_fin', '')
+            ) }}" class="flex items-center gap-2 px-6 py-3 rounded-lg bg-green-600 hover:bg-green-700 text-white shadow-md">
+                <i class="fas fa-file-excel"></i>
+                Exporter Excel (journal filtré)
+            </a>
+        </div>
+
+        <!-- Tableau des connexions -->
+        <div class="card bg-white dark:bg-dark-800 rounded-xl shadow-sm overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                    <thead class="bg-gray-50 dark:bg-gray-700">
+                        <tr>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                Agent
+                            </th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                Date/Heure
+                            </th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                Page
+                            </th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                Évènement
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white dark:bg-dark-800 divide-y divide-gray-200 dark:divide-gray-700">
+                        {% for log in logs %}
+                        <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-800 dark:text-white">
+                                {{ log[0] }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-800 dark:text-white">
+                                <div class="flex items-center">
+                                    <i class="fas fa-clock text-gray-400 mr-2"></i>
+                                    {{ log[1] }}
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-800 dark:text-white">
+                                <div class="flex items-center">
+                                    <i class="fas fa-file-alt text-blue-400 mr-2"></i>
+                                    {{ log[2] }}
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm">
+                                {% if log[3] == 'connexion' %}
+                                    <span class="px-3 py-1 rounded-full bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-200 inline-flex items-center">
+                                        <i class="fas fa-sign-in-alt mr-2"></i> Connexion
+                                    </span>
+                                {% elif log[3] == 'deconnexion' %}
+                                    <span class="px-3 py-1 rounded-full bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-200 inline-flex items-center">
+                                        <i class="fas fa-sign-out-alt mr-2"></i> Déconnexion
+                                    </span>
+                                {% else %}
+                                    <span class="px-3 py-1 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 inline-flex items-center">
+                                        <i class="fas fa-info-circle mr-2"></i> {{ log[3] }}
+                                    </span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+        <!-- Statistiques résumées -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8">
+            <div class="card bg-white dark:bg-dark-800 rounded-xl shadow-sm p-6 border border-gray-100 dark:border-gray-700">
+                <div class="flex items-center gap-4">
+                    <div class="p-3 rounded-lg bg-blue-100 dark:bg-blue-900/20">
+                        <i class="fas fa-users text-blue-600 dark:text-blue-400 text-xl"></i>
+                    </div>
+                    <div>
+                        <p class="text-sm font-medium text-gray-600 dark:text-gray-300">Agents actifs</p>
+                        <p class="text-2xl font-bold text-gray-800 dark:text-white">{{ active_agents }}</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card bg-white dark:bg-dark-800 rounded-xl shadow-sm p-6 border border-gray-100 dark:border-gray-700">
+                <div class="flex items-center gap-4">
+                    <div class="p-3 rounded-lg bg-purple-100 dark:bg-purple-900/20">
+                        <i class="fas fa-sign-in-alt text-purple-600 dark:text-purple-400 text-xl"></i>
+                    </div>
+                    <div>
+                        <p class="text-sm font-medium text-gray-600 dark:text-gray-300">Connexions</p>
+                        <p class="text-2xl font-bold text-gray-800 dark:text-white">{{ connection_count }}</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card bg-white dark:bg-dark-800 rounded-xl shadow-sm p-6 border border-gray-100 dark:border-gray-700">
+                <div class="flex items-center gap-4">
+                    <div class="p-3 rounded-lg bg-amber-100 dark:bg-amber-900/20">
+                        <i class="fas fa-sign-out-alt text-amber-600 dark:text-amber-400 text-xl"></i>
+                    </div>
+                    <div>
+                        <p class="text-sm font-medium text-gray-600 dark:text-gray-300">Déconnexions</p>
+                        <p class="text-2xl font-bold text-gray-800 dark:text-white">{{ disconnection_count }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Styles spécifiques à la page -->
+<style>
+    /* Animation pour les lignes du tableau */
+    tbody tr {
+        transition: all 0.2s ease;
+        animation: fadeIn 0.4s ease-out;
+    }
+    
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    
+    /* Style pour les badges d'événements */
+    .event-badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.4rem 1rem;
+        border-radius: 9999px;
+        font-size: 0.75rem;
+        font-weight: 500;
+        transition: all 0.2s ease;
+    }
+    
+    .event-badge:hover {
+        transform: scale(1.05);
+    }
+    
+    /* Animation pour les cartes de statistiques */
+    .stats-card {
+        transition: all 0.3s ease;
+    }
+    
+    .stats-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+    }
+    
+    .dark .stats-card:hover {
+        box-shadow: 0 10px 25px -5px rgba(255, 255, 255, 0.05);
+    }
+    
+    /* Animation pour les filtres */
+    .filters-card {
+        animation: slideIn 0.5s ease-out;
+    }
+    
+    @keyframes slideIn {
+        from {
+            opacity: 0;
+            transform: translateX(-20px);
+        }
+        to {
+            opacity: 1;
+            transform: translateX(0);
+        }
+    }
+</style>
+
+<script>
+// Animation pour les lignes du tableau
+document.addEventListener('DOMContentLoaded', function() {
+    const rows = document.querySelectorAll('tbody tr');
+    
+    rows.forEach((row, index) => {
+        row.style.animationDelay = `${index * 0.05}s`;
+    });
+    
+    // Initialisation des tooltips (exemple)
+    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    const tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+});
+</script>
+{% endblock %}

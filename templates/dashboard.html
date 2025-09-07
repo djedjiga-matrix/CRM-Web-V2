@@ -1,0 +1,412 @@
+{% extends "base.html" %}
+{% block title %}Dashboard SFR{% endblock %}
+{% block header_title %}Dashboard des clients SFR{% endblock %}
+
+{% block content %}
+<div class="max-w-full mx-auto px-4 sm:px-6 py-6">
+    <!-- En-tête du dashboard -->
+    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+        <div class="flex items-center gap-4">
+            <div class="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
+                <i class="fas fa-chart-bar text-primary text-2xl"></i>
+            </div>
+            <div>
+                <h1 class="text-2xl font-bold text-gray-800 dark:text-white">Dashboard SFR</h1>
+                <p class="text-gray-600 dark:text-gray-300">Dernière connexion : {{ auj }}</p>
+            </div>
+        </div>
+        
+        <!-- Profil agent -->
+        <div class="flex items-center gap-3 bg-white dark:bg-dark-800 rounded-xl shadow-sm p-3 border border-gray-100 dark:border-gray-700">
+            {% if agent_photo %}
+                <img src="{{ agent_photo }}" alt="Photo de profil" class="w-12 h-12 rounded-full border-2 border-primary">
+            {% else %}
+                <div class="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+                    <i class="fas fa-user text-primary"></i>
+                </div>
+            {% endif %}
+            <div>
+                <p class="font-medium text-gray-800 dark:text-white">{{ session.agent_nom }}</p>
+                <p class="text-sm text-gray-500 dark:text-gray-400">{{ session.agent_role }}</p>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Messages flash -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+    <div class="mb-6">
+        {% for category, message in messages %}
+        <div class="alert alert-{{ category }} p-4 rounded-lg border border-{{ category }}-200 dark:border-{{ category }}-700 bg-{{ category }}-50 dark:bg-{{ category }}-900/20 text-{{ category }}-800 dark:text-{{ category }}-200 text-center">
+            {{ message }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+    {% endwith %}
+    
+    <!-- Actions et statistiques -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+        <!-- Bouton d'export -->
+        <div class="card bg-white dark:bg-dark-800 rounded-xl shadow-sm p-6 border border-gray-100 dark:border-gray-700">
+            <div class="flex flex-col">
+                <h2 class="text-lg font-bold mb-4 text-gray-800 dark:text-white">Exporter les données</h2>
+                <a href="{{ url_for('export_excel_sfr',
+                    agent=request.args.get('agent', ''),
+                    statut=request.args.get('statut', ''),
+                    date_debut=request.args.get('date_debut', ''),
+                    date_fin=request.args.get('date_fin', '')
+                    ) }}" class="flex items-center justify-center gap-2 px-4 py-3 rounded-lg bg-green-600 hover:bg-green-700 text-white shadow-md">
+                    <i class="fas fa-file-excel"></i>
+                    Exporter Excel (résultats filtrés)
+                </a>
+               
+            </div>
+        </div>
+        
+        <!-- Statistiques -->
+        <div class="card bg-white dark:bg-dark-800 rounded-xl shadow-sm p-6 border border-gray-100 dark:border-gray-700 lg:col-span-2">
+            <h2 class="text-lg font-bold mb-4 text-gray-800 dark:text-white">Statistiques</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="flex items-center gap-4 p-4 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700">
+                    <div class="p-3 rounded-lg bg-green-100 dark:bg-green-900/30">
+                        <i class="fas fa-check-circle text-green-600 dark:text-green-400 text-xl"></i>
+                    </div>
+                    <div>
+                        <p class="text-sm font-medium text-gray-600 dark:text-gray-300">Clients validés</p>
+                        <p class="text-2xl font-bold text-gray-800 dark:text-white">{{ count_valide }}</p>
+                    </div>
+                </div>
+                
+                <div class="flex items-center gap-4 p-4 rounded-lg bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600">
+                    <div class="p-3 rounded-lg bg-gray-200 dark:bg-gray-600">
+                        <i class="fas fa-times-circle text-gray-600 dark:text-gray-300 text-xl"></i>
+                    </div>
+                    <div>
+                        <p class="text-sm font-medium text-gray-600 dark:text-gray-300">Clients non validés</p>
+                        <p class="text-2xl font-bold text-gray-800 dark:text-white">{{ count_non_valide }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Filtres -->
+    <div class="card bg-white dark:bg-dark-800 rounded-xl shadow-sm p-6 border border-gray-100 dark:border-gray-700 mb-6">
+        <h2 class="text-lg font-bold mb-4 text-gray-800 dark:text-white">Filtrer les données</h2>
+        
+        <form method="get" action="{{ url_for('dashboard') }}">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+                <div>
+                    <label class="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">Recherche</label>
+                    <input type="text" name="recherche" class="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-primary/50"
+                        placeholder="Nom, prénom ou téléphone" value="{{ request.args.get('recherche', '') }}">
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">Statut</label>
+                    <select name="statut" class="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-primary/50">
+                        <option value="">Tous les statuts</option>
+                        <option value="Nouveau" {% if request.args.get('statut') == 'Nouveau' %}selected{% endif %}>Nouveau</option>
+                        <option value="En cours" {% if request.args.get('statut') == 'En cours' %}selected{% endif %}>En cours</option>
+                        <option value="valide" {% if request.args.get('statut') == 'valide' %}selected{% endif %}>Valide</option>
+                        <option value="non valide" {% if request.args.get('statut') == 'non valide' %}selected{% endif %}>Non valide</option>
+                    </select>
+                </div>
+                
+                  
+                <div>
+                    <label class="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">Agent</label>
+                    <select name="agent" class="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-primary/50">
+                        <option value="">Tous les agents</option>
+                        {% for ag in agents %}
+                        <option value="{{ ag }}" {% if request.args.get('agent') == ag %}selected{% endif %}>{{ ag }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">Date début</label>
+                    <input type="date" name="date_debut" class="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-primary/50"
+                        value="{{ request.args.get('date_debut', '') }}">
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">Date fin</label>
+                    <input type="date" name="date_fin" class="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-primary/50"
+                        value="{{ request.args.get('date_fin', '') }}">
+                </div>
+                
+                <div class="flex items-end gap-2">
+                    <button type="submit" class="w-full px-4 py-2 rounded-lg bg-primary hover:bg-primary/90 text-white">
+                        <i class="fas fa-search mr-2"></i> Rechercher
+                    </button>
+                    <a href="{{ url_for('dashboard') }}" class="px-4 py-2 rounded-lg bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-800 dark:text-white">
+                        <i class="fas fa-sync-alt"></i>
+                    </a>
+                </div>
+            </div>
+        </form>
+    </div>
+    
+    <!-- Tableau des clients -->
+    <div class="card bg-white dark:bg-dark-800 rounded-xl shadow-sm p-6 border border-gray-100 dark:border-gray-700 overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                <thead class="bg-gray-50 dark:bg-gray-700">
+                    <tr>
+                        <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                            ID
+                        </th>
+                        <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                            Date signature
+                        </th>
+                        <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                            Civilité
+                        </th>
+                        <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                            Nom
+                        </th>
+                        <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                            Prénom
+                        </th>
+                        <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                            Téléphone
+                        </th>
+                    </th>
+                    <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                        Téléphone vendeur
+                    </th>
+                        <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                            Statut
+                        </th>
+                        <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                            Agent
+                        </th>
+                        <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                            Deuxième adresse
+                        </th>
+                        <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                            Créé par
+                        </th>
+                        <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                            Modifié par
+                        </th>
+                        <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                            Dernière modif
+                        </th>
+                        <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                            Actions
+                        </th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white dark:bg-dark-800 divide-y divide-gray-200 dark:divide-gray-700">
+                    {% for client in clients %}
+                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                        <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-800 dark:text-white">
+                            {{ client[0] }}
+                        </td>
+                        <!-- DATE_SIGNATURE -->
+                        <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-800 dark:text-white">
+                            {{ client[1] }}
+                        </td>
+                        <!-- CIVILITE_CLIENT -->
+                        <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-800 dark:text-white">
+                            {{ client[2] }}
+                        </td>
+                        <!-- NOM_CLIENT -->
+                        <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-800 dark:text-white">
+                            {{ client[3] }}
+                        </td>
+                        <!-- PRENOM_CLIENT -->
+                        <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-800 dark:text-white">
+                            {{ client[4] }}
+                        </td>
+                        <!-- TELEPHONE -->
+                        <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-800 dark:text-white">
+                            {{ client[5] }}
+                            <a href="aircall://call?number={{ client[5] }}" title="Appeler avec Aircall" class="ml-2 inline-block text-primary hover:text-green-600" style="font-size:20px;">
+                                <i class="fas fa-phone-alt"></i>
+                            </a>
+                            <a href="tel:{{ client[5] }}" title="Appeler avec l'application classique" class="ml-1 inline-block text-gray-500 hover:text-blue-600" style="font-size:18px;">
+                                <i class="fas fa-mobile-alt"></i>
+                            </a>
+                        </td>
+                        <!-- TELEPHONE_VENDEUR -->
+                        <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-800 dark:text-white">
+                            {{ client[48] }}
+                        <a href="aircall://call?number={{ client[48] }}" title="Appeler vendeur (Aircall)" class="ml-2 inline-block text-primary hover:text-green-600" style="font-size:20px;">
+                            <i class="fas fa-phone-alt"></i>
+                        </a>
+                        <a href="tel:{{ client[48] }}" title="Appeler vendeur (téléphone)" class="ml-1 inline-block text-gray-500 hover:text-blue-600" style="font-size:18px;">
+                            <i class="fas fa-mobile-alt"></i>
+                        </a>
+                    </td>
+                        
+                        <!-- STATUT -->
+                        <td class="px-4 py-3 whitespace-nowrap text-sm">
+                            {% if client[6] == 'valide' %}
+                                <span class="px-2 py-1 rounded-full bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 text-xs font-medium">
+                                    <i class="fas fa-check-circle mr-1"></i> valide
+                                </span>
+                            {% elif client[6] == 'non valide' %}
+                                <span class="px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 text-xs font-medium">
+                                    <i class="fas fa-times-circle mr-1"></i> non valide
+                                </span>
+                            {% else %}
+                                <span class="px-2 py-1 rounded-full bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200 text-xs font-medium">
+                                    <i class="fas fa-exclamation-circle mr-1"></i> {{ client[6] }}
+                                </span>
+                            {% endif %}
+                        </td>
+                        <!-- AGENT -->
+                        <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-800 dark:text-white">
+                            {{ client[7] }}
+                        </td>
+                        <!-- DEUXIEME_ADRESSE -->
+                        <td class="px-4 py-3 whitespace-nowrap text-sm">
+                            {% if client[8] == 'adr 2' %}
+                                <span class="px-2 py-1 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 text-xs font-medium">
+                                    Adr 2
+                                </span>
+                            {% elif client[8] == 'adr 3' %}
+                                <span class="px-2 py-1 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 text-xs font-medium">
+                                    Adr 3
+                                </span>
+                            {% else %}
+                                <span class="px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 text-xs font-medium">
+                                    ---
+                                </span>
+                            {% endif %}
+                        </td>
+                        <!-- CREE_PAR -->
+                        <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-800 dark:text-white">
+                            {{ client[13] }}
+                        </td>
+                        <!-- MODIFIE_PAR -->
+                        <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-800 dark:text-white">
+                            {{ client[14] }}
+                        </td>
+                        <!-- DATE_MODIF -->
+                        <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-800 dark:text-white">
+                            {{ client[15] }}
+                        </td>
+                        <!-- Actions -->
+                        <td class="px-4 py-3 whitespace-nowrap text-sm">
+                            <div class="flex items-center gap-1">
+                                <a href="{{ url_for('modifier_client', client_id=client[0]) }}" 
+                                   class="p-2 rounded-lg bg-yellow-500 hover:bg-yellow-600 text-white">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                                <a href="{{ url_for('historique_client', client_id=client[0]) }}" 
+                                   class="p-2 rounded-lg bg-blue-500 hover:bg-blue-600 text-white">
+                                    <i class="fas fa-history"></i>
+                                </a>
+                                <form method="post" action="{{ url_for('supprimer_client', client_id=client[0]) }}" 
+                                      onsubmit="return confirm('Supprimer ce client ?');">
+                                    <button type="submit" class="p-2 rounded-lg bg-red-500 hover:bg-red-600 text-white">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </form>
+                                <!-- Bouton de téléchargement Aircall -->
+                                <form method="post" action="{{ url_for('telecharger_aircall_numero', phone_number=client[5]) }}" style="display:inline;">
+                                    <button type="submit" title="Télécharger l'enregistrement Aircall"
+                                        class="p-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white action-btn">
+                                        <i class="fas fa-download"></i>
+                                    </button>
+                                    <!-- Pour admin/superviseur seulement -->
+                                    {% if session.agent_role in ['admin', 'superviseur'] %}
+                                    <a href="/debug_aircall/{{ client[5] }}" target="_blank" class="btn btn-sm btn-info">
+                                🔍 Debug Aircall
+                                    </a>
+                                    {% endif %}
+                                </form>                                
+
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                
+            </table>
+        </div>
+        
+        <!-- Pagination -->
+        {% if pagination %}
+        <div class="mt-6 flex justify-center">
+            <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                {% if pagination.has_prev %}
+                <a href="{{ url_for('dashboard', page=pagination.prev_num, **request.args) }}" 
+                   class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-dark-800 text-sm font-medium text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700">
+                    <i class="fas fa-chevron-left"></i>
+                </a>
+                {% endif %}
+                
+                {% for page_num in pagination.iter_pages() %}
+                    {% if page_num %}
+                        {% if page_num != pagination.page %}
+                        <a href="{{ url_for('dashboard', page=page_num, **request.args) }}" 
+                           class="relative inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-dark-800 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700">
+                            {{ page_num }}
+                        </a>
+                        {% else %}
+                        <span class="relative inline-flex items-center px-4 py-2 border border-primary bg-primary text-white text-sm font-medium">
+                            {{ page_num }}
+                        </span>
+                        {% endif %}
+                    {% else %}
+                        <span class="relative inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-dark-800 text-sm font-medium text-gray-700">
+                            ...
+                        </span>
+                    {% endif %}
+                {% endfor %}
+                
+                {% if pagination.has_next %}
+                <a href="{{ url_for('dashboard', page=pagination.next_num, **request.args) }}" 
+                   class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-dark-800 text-sm font-medium text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700">
+                    <i class="fas fa-chevron-right"></i>
+                </a>
+                {% endif %}
+            </nav>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Styles spécifiques à la page -->
+<style>
+    /* Style pour les badges */
+    .badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.25rem 0.75rem;
+        border-radius: 9999px;
+        font-size: 0.75rem;
+        font-weight: 500;
+        line-height: 1.25rem;
+    }
+    
+    /* Animation pour les boutons d'action */
+    .action-btn {
+        transition: all 0.2s ease;
+    }
+    
+    .action-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    }
+    
+    /* Style pour les lignes du tableau */
+    tbody tr {
+        transition: background-color 0.2s ease;
+    }
+    
+    /* Style pour la pagination */
+    .pagination-btn {
+        min-width: 2.5rem;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+</style>
+{% endblock %}

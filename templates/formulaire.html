@@ -1,0 +1,292 @@
+{% extends "base.html" %}
+{% block title %}Saisie Client SFR{% endblock %}
+{% block header_title %}Saisie d'un client SFR{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto px-4 sm:px-6 py-6">
+    <div class="card bg-white dark:bg-dark-800 rounded-xl shadow-sm p-8 border border-gray-100 dark:border-gray-700">
+        <!-- En-tête du formulaire -->
+        <div class="text-center mb-8">
+            <div class="w-16 h-16 mx-auto rounded-full bg-blue-100 dark:bg-blue-900/20 flex items-center justify-center">
+                <i class="fas fa-user-plus text-blue-600 dark:text-blue-400 text-2xl"></i>
+            </div>
+            <h1 class="text-2xl font-bold text-gray-800 dark:text-white mt-4">
+                Saisie d'un client SFR
+            </h1>
+            <p class="text-gray-600 dark:text-gray-300 mt-2">
+                Remplissez les informations du client
+            </p>
+        </div>
+
+        <!-- Messages flash et alertes -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        <div class="mb-6 space-y-3">
+            {% for category, message in messages %}
+            <div class="alert alert-{{ category }} p-4 rounded-lg border border-{{ category }}-200 dark:border-{{ category }}-700 bg-{{ category }}-50 dark:bg-{{ category }}-900/20 text-{{ category }}-800 dark:text-{{ category }}-200 text-center">
+                {{ message }}
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+        {% endwith %}
+        
+        {% if doublon %}
+        <div class="mb-6 p-4 rounded-lg border border-red-200 dark:border-red-700 bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-200 text-center">
+            <div class="flex items-center justify-center gap-2">
+                <i class="fas fa-exclamation-triangle"></i>
+                <span>Client déjà existant saisi par <strong>{{ ancien_agent }}</strong></span>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Formulaire -->
+        <form method="post" autocomplete="off" class="space-y-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Date de signature -->
+                <div>
+                    <label class="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">
+                        Date signature
+                    </label>
+                    <input name="DATE_SIGNATURE" type="date" 
+                           class="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                           value="{{ form['DATE_SIGNATURE'] if form else date_auj }}" required>
+                </div>
+                
+                <!-- Civilité -->
+                <div>
+                    <label class="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">
+                        Civilité
+                    </label>
+                    <select name="CIVILITE_CLIENT" 
+                            class="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                            required>
+                        <option value="">Choisir…</option>
+                        <option value="MONSIEUR" {% if form and form['CIVILITE_CLIENT']=='MONSIEUR' %}selected{% endif %}>MONSIEUR</option>
+                        <option value="MADAME" {% if form and form['CIVILITE_CLIENT']=='MADAME' %}selected{% endif %}>MADAME</option>
+                        <option value="Autre" {% if form and form['CIVILITE_CLIENT']=='Autre' %}selected{% endif %}>Autre</option>
+                    </select>
+                </div>
+                
+                <!-- Nom -->
+                <div>
+                    <label class="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">
+                        Nom
+                    </label>
+                    <input name="NOM_CLIENT" 
+                           class="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                           value="{{ form['NOM_CLIENT'] if form else '' }}" required>
+                </div>
+                
+                <!-- Prénom -->
+                <div>
+                    <label class="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">
+                        Prénom
+                    </label>
+                    <input name="PRENOM_CLIENT" 
+                           class="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                           value="{{ form['PRENOM_CLIENT'] if form else '' }}" required>
+                </div>
+                
+                <!-- Téléphone -->
+                <div>
+                    <label class="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">
+                        Téléphone
+                    </label>
+                    <input name="TELEPHONE" type="tel" 
+                           class="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                           value="{{ form['TELEPHONE'] if form else '' }}" required>
+                </div>
+                <div class="mb-4">
+                    <label for="TYPE_OFFRE" class="block font-medium mb-2">Type d’offre <span class="text-red-500">*</span></label>
+                    <select name="TYPE_OFFRE" id="TYPE_OFFRE" class="w-full px-4 py-2 rounded-lg border border-gray-300" required>
+                        <option value="">-- Choisir --</option>
+                        <option value="Box">Box</option>
+                        <option value="Mobile">Mobile</option>
+                    </select>
+                </div>
+                
+                <!-- Deuxième adresse -->
+                <div>
+                    <label class="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">
+                        Deuxième adresse
+                    </label>
+                    <select name="DEUXIEME_ADRESSE" 
+                            class="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500/50">
+                        <option value="" {% if form and form['DEUXIEME_ADRESSE']=='' %}selected{% endif %}>(Aucune)</option>
+                        <option value="adr 2" {% if form and form['DEUXIEME_ADRESSE']=='adr 2' %}selected{% endif %}>adr 2</option>
+                        <option value="adr 3" {% if form and form['DEUXIEME_ADRESSE']=='adr 3' %}selected{% endif %}>adr 3</option>
+                    </select>
+                </div>
+                
+                <!-- Troisième adresse -->
+                <div>
+                    <label class="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">
+                        Troisième adresse
+                    </label>
+                    <select name="TROISIEME_ADRESSE" 
+                            class="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500/50">
+                        <option value="" {% if form and form['TROISIEME_ADRESSE']=='' %}selected{% endif %}>(Aucune)</option>
+                        <option value="adr 3" {% if form and form['TROISIEME_ADRESSE']=='adr 3' %}selected{% endif %}>adr 3</option>
+                        <option value="adr 4" {% if form and form['TROISIEME_ADRESSE']=='adr 4' %}selected{% endif %}>adr 4</option>
+                    </select>
+                </div>
+                
+                <!-- Statut -->
+                <div>
+                    <label class="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">
+                        Statut
+                    </label>
+                    <select name="STATUT" 
+                            class="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                            required>
+                        <option value="">Choisir…</option>
+                        <option value="Nouveau" {% if form and form['STATUT']=='Nouveau' %}selected{% endif %}>Nouveau</option>
+                        <option value="En cours" {% if form and form['STATUT']=='En cours' %}selected{% endif %}>En cours</option>
+                        <option value="valide" {% if form and form['STATUT']=='valide' %}selected{% endif %}>valide</option>
+                        <option value="non valide" {% if form and form['STATUT']=='non valide' %}selected{% endif %}>non valide</option>
+                    </select>
+                </div>
+                
+                <!-- Agent -->
+                <div>
+                    <label class="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">
+                        Agent
+                    </label>
+                    {% if agent_role == 'admin' %}
+                        <select name="AGENT" 
+                                class="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                                required>
+                            <option value="">Choisir…</option>
+                            {% for ag in agents %}
+                                <option value="{{ ag }}" {% if form and form['AGENT']==ag %}selected{% endif %}>{{ ag }}</option>
+                            {% endfor %}
+                        </select>
+                    {% else %}
+                        <input name="AGENT" 
+                               class="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500/50 bg-gray-100 dark:bg-gray-700/50"
+                               value="{{ agent_nom }}" readonly>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="mb-4">
+                <label for="NOM_VENDEUR" class="block font-medium mb-2">Nom du vendeur</label>
+                <input type="text" name="NOM_VENDEUR" id="NOM_VENDEUR"
+                    class="w-full px-4 py-2 rounded-lg border border-gray-300"
+                    placeholder="Ex : Dupont">
+            </div>
+            
+            <div class="mb-4">
+                <label for="PRENOM_VENDEUR" class="block font-medium mb-2">Prénom du vendeur</label>
+                <input type="text" name="PRENOM_VENDEUR" id="PRENOM_VENDEUR"
+                    class="w-full px-4 py-2 rounded-lg border border-gray-300"
+                    placeholder="Ex : Jean">
+            </div>
+            <div class="mb-4">
+                <label for="TELEPHONE_VENDEUR" class="block font-medium mb-2">Téléphone du vendeur</label>
+                <input type="text" name="TELEPHONE_VENDEUR" id="TELEPHONE_VENDEUR"
+                    class="w-full px-4 py-2 rounded-lg border border-gray-300"
+                    placeholder="Ex : 0601020304">
+            </div>            
+            
+            <!-- Boutons d'action -->
+            <div class="flex flex-col sm:flex-row justify-center gap-4 pt-6">
+                <button type="submit" 
+                        class="flex items-center justify-center gap-2 px-6 py-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-white shadow-md transition-all hover:shadow-lg">
+                    <i class="fas fa-save"></i>
+                    Enregistrer le client
+                </button>
+                
+                <a href="/dashboard" 
+                   class="flex items-center justify-center gap-2 px-6 py-3 rounded-lg bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-800 dark:text-white shadow-md transition-all hover:shadow-lg">
+                    <i class="fas fa-chart-bar"></i>
+                    Voir le dashboard
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Styles spécifiques à la page -->
+<style>
+    /* Animation pour les champs de formulaire */
+    input, select {
+        transition: all 0.2s ease;
+    }
+    
+    input:focus, select:focus {
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
+    }
+    
+    .dark input:focus, .dark select:focus {
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.3);
+    }
+    
+    /* Effet de survol pour les boutons */
+    button, a[href] {
+        transition: all 0.3s ease;
+    }
+    
+    button:hover, a[href]:hover {
+        transform: translateY(-2px);
+    }
+    
+    /* Animation pour le chargement du formulaire */
+    @keyframes fadeInUp {
+        from {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+    
+    .card {
+        animation: fadeInUp 0.6s ease-out forwards;
+    }
+    
+    /* Style pour les sélecteurs */
+    select {
+        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+        background-position: right 0.75rem center;
+        background-repeat: no-repeat;
+        background-size: 1.5em 1.5em;
+        -webkit-appearance: none;
+        -moz-appearance: none;
+        appearance: none;
+        padding-right: 2.5rem;
+    }
+    
+    .dark select {
+        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23d1d5db' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+    }
+</style>
+
+<script>
+// Animation pour les éléments du formulaire
+document.addEventListener('DOMContentLoaded', function() {
+    const formElements = document.querySelectorAll('input, select, button, a');
+    
+    formElements.forEach((el, index) => {
+        el.style.opacity = '0';
+        el.style.transform = 'translateY(10px)';
+        el.style.transition = 'all 0.4s ease';
+        
+        setTimeout(() => {
+            el.style.opacity = '1';
+            el.style.transform = 'translateY(0)';
+        }, 100 * (index + 1));
+    });
+    
+    // Focus sur le premier champ
+    const firstInput = document.querySelector('input, select');
+    if (firstInput) {
+        setTimeout(() => {
+            firstInput.focus();
+        }, 500);
+    }
+});
+</script>
+{% endblock %}
