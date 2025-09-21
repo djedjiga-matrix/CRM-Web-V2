@@ -125,6 +125,7 @@
     </style>
 </head>
 <body class="h-full bg-gray-50 dark:bg-dark-900 flex">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <!-- Bouton Burger pour le menu mobile -->
     <button id="sidebar-toggle" class="fixed top-4 left-4 z-50 bg-primary text-white p-2 rounded-lg shadow-md md:hidden" 
             onclick="toggleMobileMenu()" title="Ouvrir/Fermer le menu">
@@ -329,6 +330,7 @@
                         <button id="finPauseBtn" type="button" class="px-4 py-2 rounded-lg bg-gray-500 text-white hover:bg-gray-600 hidden">Terminer</button>
                     </div>
                 </form>
+                
             </div>
         </div>
     </div>
@@ -575,6 +577,38 @@
    </script>
    {% endif %}
    
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const token = "{{ csrf_token() }}";
+    // 1) Auto-injecter input hidden dans tous les formulaires POST
+    document.querySelectorAll('form[method="post"]').forEach(f => {
+      if (!f.querySelector('input[name="csrf_token"]')) {
+        const i = document.createElement('input');
+        i.type = 'hidden';
+        i.name = 'csrf_token';
+        i.value = token;
+        f.appendChild(i);
+      }
+    });
 
+    // 2) Si tu utilises fetch/axios pour POST, ajoute le header X-CSRFToken
+    const meta = document.querySelector('meta[name="csrf-token"]');
+    const csrf = meta ? meta.getAttribute('content') : token;
+
+    // Patch global fetch (si vous l’utilisez)
+    const _fetch = window.fetch;
+    window.fetch = function(url, opts = {}) {
+      opts.headers = opts.headers || {};
+      // N’ajouter le token que pour les méthodes qui le nécessitent
+      const method = (opts.method || 'GET').toUpperCase();
+      if (['POST','PUT','PATCH','DELETE'].includes(method)) {
+        if (!opts.headers['X-CSRFToken'] && !opts.headers['X-CSRF-Token']) {
+          opts.headers['X-CSRFToken'] = csrf;
+        }
+      }
+      return _fetch(url, opts);
+    };
+  });
+</script>
 </body>
 </html>

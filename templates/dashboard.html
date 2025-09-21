@@ -307,6 +307,7 @@
                                     <button type="submit" class="p-2 rounded-lg bg-red-500 hover:bg-red-600 text-white">
                                         <i class="fas fa-trash"></i>
                                     </button>
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                 </form>
                                 <!-- Bouton de téléchargement Aircall -->
                                 <form method="post" action="{{ url_for('telecharger_aircall_numero', phone_number=client[5]) }}" style="display:inline;">
@@ -320,6 +321,7 @@
                                 🔍 Debug Aircall
                                     </a>
                                     {% endif %}
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                 </form>                                
 
                             </div>

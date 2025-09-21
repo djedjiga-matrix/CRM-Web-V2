@@ -64,6 +64,7 @@
         </h2>
         
         <form method="post" enctype="multipart/form-data" autocomplete="off">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
             <!-- Nom -->
             <div>
@@ -189,6 +190,7 @@
                       <i class="fas fa-trash-alt mr-1"></i>
                       Supprimer
                     </button>
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                   </form>
                 </div>
               </td>

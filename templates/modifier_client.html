@@ -29,6 +29,7 @@
         
         <!-- Formulaire -->
         <form method="post" autocomplete="off" class="p-6">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <!-- Grille de champs -->
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                 <!-- Date de signature -->
