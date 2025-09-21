@@ -1,0 +1,9 @@
+Flask
+Flask-SocketIO
+python-dotenv
+Flask-WTF
+Flask-Limiter
+bcrypt
+requests
+pandas
+openpyxl

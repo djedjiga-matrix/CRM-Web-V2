@@ -19,13 +19,18 @@ from requests.auth import HTTPBasicAuth
 import json
 import hashlib
 import uuid
+from dotenv import load_dotenv
+load_dotenv()  # charge le fichier .env dans les variables d'environnement
+from flask_wtf import CSRFProtect
+from flask_wtf.csrf import generate_csrf
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Aircall - Identifiants API
-# ──────────────────────────────────────────────────────────────────────────────
-API_ID = "14342ea77dfd55b82e3aeb036839179b"
-API_TOKEN = "d6662ea5443e261e9616f1286593cf5f"
 
+
+
+
+AIRCALL_API_TOKEN = os.getenv("AIRCALL_API_TOKEN", "")
 # ──────────────────────────────────────────────────────────────────────────────
 # Helpers: normalisation & MAJ CALL_ID depuis Aircall
 # ──────────────────────────────────────────────────────────────────────────────
@@ -177,15 +182,35 @@ def get_last_aircall_id_by_number(phone_number):
 # Flask
 # ──────────────────────────────────────────────────────────────────────────────
 app = Flask(__name__)
-app.secret_key = "Melissa1977!"
+# Secret Key lue depuis .env (obligatoire en prod). En dev, on tolère un fallback généré.
+app.secret_key = os.getenv("SECRET_KEY") or os.urandom(32)
 socketio = SocketIO(app)
+# --- Rate Limiting ---
+# Stockage en mémoire (suffisant pour une instance simple). Pour du multi-instance, utiliser Redis.
+limiter = Limiter(
+    get_remote_address,              # clé = IP du client
+    app=app,
+    default_limits=["200 per day", "50 per hour"],  # limites globales "soft"
+    storage_uri="memory://",
+)
 
-DB_NAME = "crm_clients.db"
-UPLOAD_FOLDER = os.path.join('static', 'uploads')
+
+DB_NAME = os.getenv("DB_NAME", "crm_clients.db")
+UPLOAD_FOLDER = os.getenv("UPLOAD_FOLDER", os.path.join('static', 'uploads'))
 if not os.path.exists(UPLOAD_FOLDER):
-    os.makedirs(UPLOAD_FOLDER)
+    os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024  # 5 Mo
+
+# --- CSRF ---
+app.config['WTF_CSRF_ENABLED'] = True            # activé explicitement (par défaut True, mais on force)
+app.config['WTF_CSRF_TIME_LIMIT'] = None         # pas d'expiration du token pendant la session (pratique en dev)
+csrf = CSRFProtect(app)
+
+# Rendre le token CSRF accessible dans les templates : {{ csrf_token() }}
+@app.context_processor
+def inject_csrf_token():
+    return dict(csrf_token=lambda: generate_csrf())
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Base de données
@@ -352,6 +377,7 @@ creer_table()
 # Authentification
 # ──────────────────────────────────────────────────────────────────────────────
 @app.route('/login', methods=['GET', 'POST'])
+@limiter.limit("5 per minute; 20 per hour", methods=["POST"], error_message="Trop de tentatives. Réessayez dans une minute.")
 def login():
     if request.method == 'POST':
         if 'agent_nom' in session:
@@ -419,7 +445,7 @@ def logout():
     return redirect(url_for('login'))
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Formulaires d’ajout
+# Formulaires d'ajout
 # ──────────────────────────────────────────────────────────────────────────────
 @app.route('/', methods=['GET', 'POST'])
 def index():
@@ -433,7 +459,7 @@ def index():
         flash("Accès interdit à ce formulaire.", "danger")
         return redirect(url_for('login'))
 
-    # s’assure que TYPE_OFFRE existe
+    # s'assure que TYPE_OFFRE existe
     conn_check = sqlite3.connect(DB_NAME)
     c_check = conn_check.cursor()
     try:
@@ -1059,17 +1085,40 @@ def modifier_agent(agent_id):
     agent = c.fetchone()
 
     if request.method == 'POST':
-        nom = request.form['NOM']
-        login = request.form['LOGIN']
-        mdp = request.form['MDP']
-        role = request.form['ROLE']
-        camp_id = request.form['CAMPAGNE_ID']
+        # Récupération des champs du formulaire (avec valeurs par défaut sûres)
+        nom = request.form.get('NOM', '').strip()
+        login = request.form.get('LOGIN', '').strip()
+        mdp = request.form.get('MDP', '')
+        role = request.form.get('ROLE', 'agent').strip()
 
-        if mdp.strip() == "":
-            c.execute("UPDATE agents SET NOM=?, LOGIN=?, ROLE=?, campagne_id=? WHERE id=?", (nom, login, role, camp_id, agent_id))
+        # ⚠️ CAMPAGNE_ID peut ne pas être envoyé par le formulaire de modif.
+        # Si présent, on le prend ; sinon, on conserve la valeur actuelle en base.
+        campagne_id_str = request.form.get('CAMPAGNE_ID', '').strip()
+        if campagne_id_str == '':
+            # Garder la valeur existante
+            c.execute("SELECT campagne_id FROM agents WHERE id=?", (agent_id,))
+            row = c.fetchone()
+            campagne_id = row[0] if row else None
         else:
-            # On ne rechiffre pas ici pour garder le scope minimal (à adapter si besoin)
-            c.execute("UPDATE agents SET NOM=?, LOGIN=?, MDP=?, ROLE=?, campagne_id=? WHERE id=?", (nom, login, mdp, role, camp_id, agent_id))
+            # Convertir proprement en int, sinon mettre à None
+            try:
+                campagne_id = int(campagne_id_str)
+            except ValueError:
+                campagne_id = None
+
+        # ✅ Mise à jour : si mdp non vide -> on hash, sinon on ne touche pas à MDP
+        if mdp.strip():
+            hashed_mdp = bcrypt.hashpw(mdp.encode('utf-8'), bcrypt.gensalt())
+            c.execute(
+                "UPDATE agents SET NOM=?, LOGIN=?, MDP=?, ROLE=?, campagne_id=? WHERE id=?",
+                (nom, login, hashed_mdp, role, campagne_id, agent_id)
+            )
+        else:
+            c.execute(
+                "UPDATE agents SET NOM=?, LOGIN=?, ROLE=?, campagne_id=? WHERE id=?",
+                (nom, login, role, campagne_id, agent_id)
+            )
+
         conn.commit()
         conn.close()
         flash("Agent modifié avec succès.", "success")
@@ -1105,6 +1154,25 @@ def supprimer_client(client_id):
         return redirect(url_for('login'))
     conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
+
+    # --- CONTRÔLE D'AUTORISATION ---
+    role = session.get('agent_role')
+    agent_session = session.get('agent_nom')
+
+    c.execute("SELECT AGENT FROM clients WHERE id=?", (client_id,))
+    row = c.fetchone()
+    if not row:
+        conn.close()
+        flash("Client introuvable.", "danger")
+        return redirect(url_for('dashboard'))
+
+    owner = row[0]
+
+    if role not in ("admin", "superviseur") and owner != agent_session:
+        conn.close()
+        flash("Accès refusé : vous ne pouvez supprimer que vos propres fiches.", "danger")
+        return redirect(url_for('dashboard'))
+
     c.execute("DELETE FROM clients WHERE id=?", (client_id,))
     conn.commit()
     conn.close()
@@ -1118,10 +1186,30 @@ def modifier_client(client_id):
     conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
 
-    c.execute("SELECT campagne_id FROM clients WHERE id=?", (client_id,))
+    # --- CONTRÔLE D'AUTORISATION ---
+    role = session.get('agent_role')
+    agent_session = session.get('agent_nom')
+
+    # On récupère le propriétaire de la fiche (colonne AGENT)
+    c.execute("SELECT AGENT FROM clients WHERE id= ?", (client_id,))
+    row = c.fetchone()
+    if not row:
+        conn.close()
+        flash("Client introuvable.", "danger")
+        return redirect(url_for('dashboard'))
+
+    owner = row[0]
+
+    # Seuls admin/superviseur OU le propriétaire peuvent modifier
+    if role not in ("admin", "superviseur") and owner != agent_session:
+        conn.close()
+        flash("Accès refusé : vous ne pouvez modifier que vos propres fiches.", "danger")
+        return redirect(url_for('dashboard'))
+
+    c.execute("SELECT campagne_id FROM clients WHERE id= ?", (client_id,))
     campagne_id_row = c.fetchone()
     campagne_id = campagne_id_row[0] if campagne_id_row else 1
-    c.execute("SELECT nom FROM campagnes WHERE id=?", (campagne_id,))
+    c.execute("SELECT nom FROM campagnes WHERE id= ?", (campagne_id,))
     campagne_nom_row = c.fetchone()
     campagne_nom = campagne_nom_row[0] if campagne_nom_row else "EXOSPHERE_SFR"
 
@@ -1133,7 +1221,7 @@ def modifier_client(client_id):
                 champs += [f"{prod}_NUM", f"{prod}_STATUT", f"{prod}_REMARQUE"]
             champs += ['EXTRANET','AGENT']
 
-            c.execute(f"SELECT {', '.join(champs)} FROM clients WHERE id=?", (client_id,))
+            c.execute(f"SELECT {', '.join(champs)} FROM clients WHERE id= ?", (client_id,))
             ancien = c.fetchone()
 
             nouveaux = (
@@ -1153,7 +1241,7 @@ def modifier_client(client_id):
 
             update_fields = ", ".join([f"{champs[i]}=?" for i in range(len(champs))])
             data = nouveaux + (session['agent_nom'], datetime.now().strftime("%Y-%m-%d %H:%M:%S"), client_id)
-            c.execute(f"UPDATE clients SET {update_fields}, MODIFIE_PAR=?, DATE_MODIF=? WHERE id=?", data)
+            c.execute(f"UPDATE clients SET {update_fields}, MODIFIE_PAR=?, DATE_MODIF=? WHERE id= ?", data)
             conn.commit()
             conn.close()
             notifier_nouveau_client(request.form['NOM_CLIENT'])
@@ -1161,7 +1249,7 @@ def modifier_client(client_id):
             return redirect(url_for('dashboard_valandre'))
 
         else:
-            c.execute("SELECT DATE_SIGNATURE, CIVILITE_CLIENT, NOM_CLIENT, PRENOM_CLIENT, TELEPHONE, STATUT, AGENT, DEUXIEME_ADRESSE, TROISIEME_ADRESSE FROM clients WHERE id=?", (client_id,))
+            c.execute("SELECT DATE_SIGNATURE, CIVILITE_CLIENT, NOM_CLIENT, PRENOM_CLIENT, TELEPHONE, STATUT, AGENT, DEUXIEME_ADRESSE, TROISIEME_ADRESSE FROM clients WHERE id= ?", (client_id,))
             ancien = c.fetchone()
             nouveaux = (
                 request.form['DATE_SIGNATURE'], request.form['CIVILITE_CLIENT'], request.form['NOM_CLIENT'], request.form['PRENOM_CLIENT'],
@@ -1182,7 +1270,7 @@ def modifier_client(client_id):
                 UPDATE clients
                 SET DATE_SIGNATURE=?, CIVILITE_CLIENT=?, NOM_CLIENT=?, PRENOM_CLIENT=?, TELEPHONE=?, STATUT=?, AGENT=?, DEUXIEME_ADRESSE=?, TROISIEME_ADRESSE=?,
                     MODIFIE_PAR=?, DATE_MODIF=?
-                WHERE id=?
+                WHERE id= ?
             """, data)
             conn.commit()
             conn.close()
@@ -1196,14 +1284,14 @@ def modifier_client(client_id):
         for prod in produits:
             champs += [f'{prod}_NUM', f'{prod}_STATUT', f'{prod}_REMARQUE']
         champs += ['EXTRANET','AGENT']
-        c.execute(f"SELECT {', '.join(champs)} FROM clients WHERE id=?", (client_id,))
+        c.execute(f"SELECT {', '.join(champs)} FROM clients WHERE id= ?", (client_id,))
         client_row = c.fetchone()
         client = dict(zip(champs, client_row))
         agents = get_agents()
         conn.close()
         return render_template('modifier_client_valandre.html', client=client, agents=agents)
     else:
-        c.execute("SELECT id, DATE_SIGNATURE, CIVILITE_CLIENT, NOM_CLIENT, PRENOM_CLIENT, TELEPHONE, STATUT, AGENT, DEUXIEME_ADRESSE, TROISIEME_ADRESSE FROM clients WHERE id=?", (client_id,))
+        c.execute("SELECT id, DATE_SIGNATURE, CIVILITE_CLIENT, NOM_CLIENT, PRENOM_CLIENT, TELEPHONE, STATUT, AGENT, DEUXIEME_ADRESSE, TROISIEME_ADRESSE FROM clients WHERE id= ?", (client_id,))
         client = c.fetchone()
         c.execute("SELECT NOM FROM agents")
         agents = [row[0] for row in c.fetchall()]
@@ -2186,13 +2274,21 @@ def play_aircall(phone_number):
         resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
         resp.headers['Pragma'] = 'no-cache'
         resp.headers['Expires'] = '0'
-        # Empêche le navigateur de "mémoriser" l’URL par défaut
+        # Empêche le navigateur de "mémoriser" l'URL par défaut
         resp.headers['Content-Disposition'] = 'inline; filename="aircall_preview.mp3"'
         return resp
     except Exception as e:
         print(f"[play_aircall] Erreur: {e}")
         flash("Erreur pendant la lecture de l'enregistrement.", "danger")
         return redirect(url_for('dashboard'))
+
+
+
+@app.errorhandler(429)
+def ratelimit_handler(e):
+    # Petit message, et on renvoie vers la page de login
+    flash("Trop de tentatives de connexion. Réessayez dans 1 minute.", "danger")
+    return redirect(url_for('login'))
 
 
 # ──────────────────────────────────────────────────────────────────────────────
