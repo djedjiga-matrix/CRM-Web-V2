@@ -178,6 +178,13 @@
                                     <span class="menu-text">Nouveau Client SFR</span>
                                 </a>
                             </li>
+                            <li>
+                                <a href="/dashboard_humanitaire" 
+                                   class="nav-link flex items-center space-x-3 p-2 rounded-lg {% if request.path == '/dashboard_humanitaire' %}active{% endif %}">
+                                  <i class="fas fa-chart-pie w-5"></i>
+                                  <span class="menu-text">Dashboard Humanitaire</span>
+                                </a>
+                              </li>                              
                             
                             {% if session.agent_role == 'admin' %}
                             <hr class="mx-3 my-3 border-gray-200 dark:border-gray-700">

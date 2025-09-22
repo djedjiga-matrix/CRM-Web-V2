@@ -342,15 +342,13 @@ def creer_table():
         except sqlite3.OperationalError:
             pass
 
-    # Chat
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS chat_messages (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user TEXT,
-            message TEXT,
-            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+    # *** Nouvelle campagne Humanitaire ***
+    c.execute("SELECT COUNT(*) FROM campagnes WHERE nom='HUMANITAIRE'")
+    if c.fetchone()[0] == 0:
+        c.execute(
+            "INSERT INTO campagnes (nom, type_export) VALUES (?, ?)",
+            ('HUMANITAIRE', 'simple')
         )
-    """)
 
     conn.commit()
     conn.close()
@@ -960,6 +958,150 @@ def formulaire_valandre():
     return render_template('formulaire_valandre.html',
                            agents=agents, agent_nom=session['agent_nom'],
                            agent_role=session['agent_role'], date_auj=date_auj)
+@app.route('/dashboard_humanitaire')
+def dashboard_humanitaire():
+    # Contrôle d’accès : réservé admin/superviseur ou agents de la campagne Humanitaire
+    if 'agent_nom' not in session:
+        return redirect(url_for('login'))
+    # Récupérer l’ID de la campagne Humanitaire
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+    c.execute("SELECT id FROM campagnes WHERE nom = 'HUMANITAIRE'")
+    campagne_row = c.fetchone()
+    campagne_id = campagne_row[0] if campagne_row else None
+    if session.get('agent_role') not in ['admin', 'superviseur'] and session.get('campagne_id') != campagne_id:
+        flash("Accès interdit à ce dashboard.", "danger")
+        conn.close()
+        return redirect(url_for('index'))
+
+    # Préparation des filtres depuis les paramètres GET
+    recherche = request.args.get('recherche', '').strip()
+    statut = request.args.get('statut', '').strip()
+    agent = request.args.get('agent', '').strip()
+    date_debut = request.args.get('date_debut', '').strip()
+    date_fin = request.args.get('date_fin', '').strip()
+
+    # Si aucun filtre n’est fourni, on peut par défaut filtrer sur la date du jour
+    auj = datetime.now().strftime('%Y-%m-%d')
+    if not recherche and not statut and not agent and not date_debut and not date_fin:
+        date_debut = date_fin = auj
+
+    # Pagination
+    try:
+        page = int(request.args.get('page', 1))
+        if page < 1:
+            page = 1
+    except ValueError:
+        page = 1
+    par_page = 20
+    offset = (page - 1) * par_page
+
+    # Construction de la requête SQL filtrée
+    # On sélectionne les colonnes pertinentes de la table clients pour la campagne Humanitaire
+    base_sql = """
+        SELECT id, DATE_SIGNATURE, CIVILITE_CLIENT, NOM_CLIENT, PRENOM_CLIENT,
+               TELEPHONE, STATUT, AGENT, DEUXIEME_ADRESSE,
+               CREE_PAR, MODIFIE_PAR, DATE_MODIF
+        FROM clients
+        WHERE campagne_id = ?
+    """
+    params = [campagne_id]
+    if recherche:
+        base_sql += " AND (NOM_CLIENT LIKE ? OR PRENOM_CLIENT LIKE ? OR TELEPHONE LIKE ?)"
+        critere = f"%{recherche}%"
+        params += [critere, critere, critere]
+    if statut:
+        base_sql += " AND STATUT = ?"
+        params.append(statut)
+    if agent:
+        base_sql += " AND AGENT = ?"
+        params.append(agent)
+    if date_debut:
+        base_sql += " AND DATE_SIGNATURE >= ?"
+        params.append(date_debut)
+    if date_fin:
+        base_sql += " AND DATE_SIGNATURE <= ?"
+        params.append(date_fin)
+
+    # Ajout du tri et de la limite (pour pagination)
+    sql_pagination = base_sql + " ORDER BY DATE_SIGNATURE DESC LIMIT ? OFFSET ?"
+    params_pagination = params + [par_page, offset]
+    c.execute(sql_pagination, tuple(params_pagination))
+    clients = c.fetchall()
+
+    # Calcul des statistiques (exemple : nombre validé/non validé pour le filtre actuel)
+    # On réutilise les mêmes filtres de base via une sous-requête et COUNT(*)
+    def count_by_statut(statut_value):
+        sql_count = "SELECT COUNT(*) FROM (" + base_sql + " AND STATUT = ?) as t"
+        c.execute(sql_count, tuple(params + [statut_value]))
+        res = c.fetchone()
+        return res[0] if res else 0
+
+    count_valide = count_by_statut('valide')
+    count_non_valide = count_by_statut('non valide')
+
+    # Nombre total de clients (pour pagination)
+    count_sql = "SELECT COUNT(*) FROM clients WHERE campagne_id = ?"
+    count_params = [campagne_id]
+    if recherche:
+        count_sql += " AND (NOM_CLIENT LIKE ? OR PRENOM_CLIENT LIKE ? OR TELEPHONE LIKE ?)"
+        count_params += [critere, critere, critere]
+    if statut:
+        count_sql += " AND STATUT = ?"
+        count_params.append(statut)
+    if agent:
+        count_sql += " AND AGENT = ?"
+        count_params.append(agent)
+    if date_debut:
+        count_sql += " AND DATE_SIGNATURE >= ?"
+        count_params.append(date_debut)
+    if date_fin:
+        count_sql += " AND DATE_SIGNATURE <= ?"
+        count_params.append(date_fin)
+    c.execute(count_sql, tuple(count_params))
+    _row = c.fetchone()
+    total_clients = _row[0] if _row else 0
+    total_pages = (total_clients + par_page - 1) // par_page
+
+    # Récupérer la liste des agents (pour le filtre "Tous les agents")
+    agents = get_agents()
+    # Récupérer la photo de profil de l’agent (affichage dans le bandeau)
+    c.execute("SELECT photo FROM agents WHERE NOM = ?", (session['agent_nom'],))
+    photo_row = c.fetchone()
+    photo_filename = photo_row[0] if photo_row and photo_row[0] else None
+    agent_photo = url_for('static', filename='uploads/' + photo_filename) if photo_filename else url_for('static', filename='img/avatar.png')
+    conn.close()
+
+    # Préparer l’objet de pagination pour le template
+    class Pagination:
+        def __init__(self, page, total_pages):
+            self.page = page
+            self.total_pages = total_pages
+        @property
+        def has_prev(self): return self.page > 1
+        @property
+        def has_next(self): return self.page < self.total_pages
+        @property
+        def prev_num(self): return self.page - 1
+        @property
+        def next_num(self): return self.page + 1
+        def iter_pages(self):
+            left = max(1, self.page - 2)
+            right = min(self.total_pages, self.page + 2)
+            return range(left, right + 1)
+
+    pagination = Pagination(page, total_pages)
+
+    # Renvoyer le template avec toutes les variables requises
+    return render_template('dashboard_humanitaire.html',
+                           clients=clients,
+                           agents=agents,
+                           agent_photo=agent_photo,
+                           auj=auj,
+                           count_valide=count_valide,
+                           count_non_valide=count_non_valide,
+                           pagination=pagination)
+                        
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Paramètres / Agents
@@ -1426,6 +1568,78 @@ def export_excel_valandre():
 
     with tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx') as tmp:
         wb.save(tmp.name)
+        tmp_path = tmp.name
+
+    response = send_file(tmp_path, as_attachment=True)
+    try:
+        os.remove(tmp_path)
+    except Exception:
+        pass
+
+    return response
+
+@app.route('/export_excel_humanitaire')
+def export_excel_humanitaire():
+    if 'agent_nom' not in session:
+        return redirect(url_for('login'))
+
+    def clean_date(dt):
+        if not dt:
+            return ""
+        dt = dt.strip()
+        return dt
+
+    recherche = request.args.get('recherche', '').strip()
+    statut = request.args.get('statut', '').strip()
+    agent = request.args.get('agent', '').strip()
+    date_debut = clean_date(request.args.get('date_debut', '').strip())
+    date_fin = clean_date(request.args.get('date_fin', '').strip())
+
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+    c.execute("SELECT id FROM campagnes WHERE nom = 'HUMANITAIRE'")
+    campagne_row = c.fetchone()
+    campagne_id = campagne_row[0] if campagne_row else None
+
+    sql = (
+        "SELECT DATE_SIGNATURE, CIVILITE_CLIENT, NOM_CLIENT, PRENOM_CLIENT, "
+        "TELEPHONE, STATUT, AGENT, DEUXIEME_ADRESSE, CREE_PAR, MODIFIE_PAR, DATE_MODIF "
+        "FROM clients WHERE campagne_id = ?"
+    )
+    params = [campagne_id]
+
+    if recherche:
+        sql += " AND (NOM_CLIENT LIKE ? OR PRENOM_CLIENT LIKE ? OR TELEPHONE LIKE ?)"
+        crit = f"%{recherche}%"
+        params += [crit, crit, crit]
+    if statut:
+        sql += " AND STATUT = ?"
+        params.append(statut)
+    if agent:
+        sql += " AND AGENT = ?"
+        params.append(agent)
+    if date_debut:
+        sql += " AND DATE_SIGNATURE >= ?"
+        params.append(date_debut)
+    if date_fin:
+        sql += " AND DATE_SIGNATURE <= ?"
+        params.append(date_fin)
+
+    sql += " ORDER BY DATE_SIGNATURE DESC"
+
+    c.execute(sql, tuple(params))
+    rows = c.fetchall()
+    conn.close()
+
+    columns = [
+        "DATE_SIGNATURE", "CIVILITE_CLIENT", "NOM_CLIENT", "PRENOM_CLIENT",
+        "TELEPHONE", "STATUT", "AGENT", "DEUXIEME_ADRESSE",
+        "CREE_PAR", "MODIFIE_PAR", "DATE_MODIF"
+    ]
+    df = pd.DataFrame(rows, columns=columns)
+
+    with tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx') as tmp:
+        df.to_excel(tmp.name, index=False)
         tmp_path = tmp.name
 
     response = send_file(tmp_path, as_attachment=True)
