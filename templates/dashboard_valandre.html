@@ -266,10 +266,11 @@
                         </td>
                         <!-- Actions -->
                         <td class="px-4 py-3 whitespace-nowrap text-sm">
-                            <a href="{{ url_for('modifier_client', client_id=c.id) }}" 
-                               class="inline-flex items-center px-3 py-1 rounded-lg bg-yellow-500 hover:bg-yellow-600 text-white text-sm">
+                            <a href="{{ url_for('modifier_client', client_id=c['id'], src='valandre') }}" 
+                                class="inline-flex items-center px-3 py-1 rounded-lg bg-yellow-500 hover:bg-yellow-600 text-white text-sm">
                                 <i class="fas fa-edit mr-1"></i> Modifier
                             </a>
+
                         </td>
                     </tr>
                     {% endfor %}

@@ -14,6 +14,7 @@
         <!-- Formulaire -->
         <form method="post" enctype="multipart/form-data" autocomplete="off" class="p-6">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
             <!-- Nom -->
             <div class="mb-6">
                 <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
@@ -40,8 +41,20 @@
                 <input name="MDP" type="password"
                     class="w-full px-4 py-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700 focus:ring-2 focus:ring-primary/50 focus:border-transparent text-gray-900 dark:text-white">
             </div>
-
-            <!-- Rôle et Campagne -->
+            <!-- TV (log de l'agent, ex: M houcine38) -->
+            <div class="mb-6">
+                <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
+                    TV (log de l’agent)
+                </label>
+                <input name="TV" value="{{ agent[6] or '' }}"
+                    placeholder="Ex: M houcine38"
+                    class="w-full px-4 py-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700 focus:ring-2 focus:ring-primary/50 focus:border-transparent text-gray-900 dark:text-white">
+                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    Utilisé pour créer automatiquement l’agent Humanitaire (si Nom/Prénom manquants).
+                </p>
+            </div>
+  
+            <!-- Rôle / Campagne / Pays -->
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                 <!-- Rôle -->
                 <div>
@@ -68,6 +81,26 @@
                         {% endfor %}
                     </select>
                 </div>
+
+                <!-- Pays (AJOUT) -->
+                <div class="md:col-span-2">
+                    <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
+                        Pays
+                    </label>
+                    <select name="PAYS_CODE" required
+                        class="w-full px-4 py-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700 focus:ring-2 focus:ring-primary/50 focus:border-transparent text-gray-900 dark:text-white">
+                        <option value="" disabled>— Sélectionner —</option>
+                        {# IMPORTANT : on suppose que le backend envoie 'countries' et que agent[5] = PAYS_CODE #}
+                        {% for p in countries %}
+                            <option value="{{ p.code }}" {% if agent and agent[5] == p.code %}selected{% endif %}>
+                                {{ p.nom }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                    <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                        Ce champ lie l’agent à un pays. Il servira pour afficher les montants en monnaie locale.
+                    </p>
+                </div>
             </div>
 
             <!-- Photo de profil -->
@@ -75,12 +108,13 @@
                 <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
                     Photo de profil
                 </label>
-                
+
                 <div class="flex items-center space-x-6">
                     <!-- Prévisualisation -->
                     <div class="relative">
-                        {% if agent and agent[5] %}
-                            <img src="{{ url_for('static', filename='uploads/' ~ agent[5]) }}" 
+                        {# ⚠️ ICI on suppose que le backend renvoie aussi la colonne 'photo' en 7e position (agent[6]) #}
+                        {% if agent and agent[7] %}
+                            <img src="{{ url_for('static', filename='uploads/' ~ agent[7]) }}" 
                                 alt="Photo de profil" 
                                 class="w-24 h-24 rounded-full border-4 border-primary/20 object-cover shadow-md">
                         {% else %}
@@ -92,7 +126,7 @@
                             <i class="fas fa-camera text-primary"></i>
                         </div>
                     </div>
-                    
+
                     <!-- Upload -->
                     <div class="flex-1">
                         <input type="file" name="photo" accept="image/*" 
@@ -117,7 +151,7 @@
                     <i class="fas fa-save mr-2"></i>
                     Enregistrer les modifications
                 </button>
-                
+
                 <a href="{{ url_for('parametres') }}"
                     class="px-6 py-3 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 font-semibold rounded-lg shadow-md transition-colors duration-300 flex items-center justify-center">
                     <i class="fas fa-times mr-2"></i>

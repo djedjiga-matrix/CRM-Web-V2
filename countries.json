@@ -1,0 +1,38 @@
+[
+    {
+      "code": "DZ",
+      "nom": "Algérie",
+      "devise_code": "DZD",
+      "devise_symbole": "د.ج",
+      "format": "{montant} DZD"
+    },
+    {
+      "code": "FR",
+      "nom": "France",
+      "devise_code": "EUR",
+      "devise_symbole": "€",
+      "format": "{montant} €"
+    },
+    {
+      "code": "TN",
+      "nom": "Tunisie",
+      "devise_code": "TND",
+      "devise_symbole": "DT",
+      "format": "{montant} DT"
+    },
+    {
+      "code": "SN",
+      "nom": "Sénégal",
+      "devise_code": "XOF",
+      "devise_symbole": "CFA",
+      "format": "{montant} CFA"
+    },
+    {
+      "code": "MU",
+      "nom": "Île Maurice",
+      "devise_code": "MUR",
+      "devise_symbole": "Rs",
+      "format": "Rs {montant}"
+    }
+  ]
+  

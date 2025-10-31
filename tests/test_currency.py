@@ -45,3 +45,12 @@ def test_invalid_amount_raises():
 def test_invalid_rate_raises():
     with pytest.raises(ValueError):
         format_local_amount(100, "FR", taux_change=0)
+def test_format_dzd_2_decimals():
+    out = format_local_amount(99.9, "DZ")
+    assert out.endswith(" DZD")
+    assert "," in out  # décimales FR
+
+def test_format_mur_0_decimals():
+    out = format_local_amount(2500, "MU")
+    assert out.endswith(" MUR")
+    assert "," not in out  # pas de décimales

@@ -49,6 +49,8 @@
         }
     </script>
     <style>
+        body, main { background-color: #f9fafb !important; }
+        
         /* Styles personnalisés pour la sidebar */
         .sidebar {
             transition: all 0.3s ease;
@@ -149,6 +151,15 @@
                         <h3 class="text-xs uppercase font-semibold text-gray-500 dark:text-gray-400 mb-2">Menu Principal</h3>
                         <ul class="space-y-1">
                             <li>
+
+                                <a href="http://127.0.0.1:5001/" target="_blank" rel="noopener"
+                                    class="px-4 py-2 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition inline-flex items-center">
+                                    <i class="fas fa-file-invoice-dollar mr-2"></i>
+                                    Paie
+                                </a>
+
+
+
                                 <a href="/overview" class="nav-link flex items-center space-x-3 p-2 rounded-lg {% if request.path == '/overview' %}active{% endif %}">
                                     <i class="fas fa-chart-line w-5"></i>
                                     <span class="menu-text">Overview</span>

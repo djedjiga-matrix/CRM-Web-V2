@@ -18,8 +18,12 @@
             </p>
         </div>
 
-        <form method="post" autocomplete="off" class="space-y-6">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <form method="post"
+        action="{{ url_for('formulaire_valandre') }}"
+        autocomplete="off"
+        class="space-y-6" id="valandre-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="_form_id" value="valandre_form">
             <!-- Section Informations Générales -->
             <div class="bg-blue-50 dark:bg-blue-900/10 rounded-xl p-5">
                 <div class="flex items-center gap-2 mb-4">
@@ -207,6 +211,7 @@
             <!-- Boutons d'action -->
             <div class="flex flex-col sm:flex-row justify-center gap-4 pt-4">
                 <button type="submit" 
+                name="_action" value="save"
                         class="flex items-center justify-center gap-2 px-6 py-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-white shadow-md transition-all hover:shadow-lg">
                     <i class="fas fa-save"></i>
                     Enregistrer le client
@@ -224,136 +229,100 @@
 
 <script>
 function toggleProduitFields(prod) {
-    const checkbox = document.querySelector(`input[name="produits"][value="${prod}"]`);
+    // Utilise l'ID, c’est fiable
+    // corriger cette ligne :
+    const checkbox = document.querySelector(`input[name="produits[]"][value="${prod}"]`);
     const fieldsDiv = document.getElementById(`fields-${prod}`);
-    
+    if (!checkbox || !fieldsDiv) return;
+
     if (checkbox.checked) {
         fieldsDiv.classList.remove('hidden');
-        // Animation d'apparition
+        // petite animation
         fieldsDiv.style.opacity = '0';
         fieldsDiv.style.transform = 'translateY(10px)';
         fieldsDiv.style.transition = 'all 0.3s ease';
-        
-        setTimeout(() => {
+        requestAnimationFrame(() => {
             fieldsDiv.style.opacity = '1';
             fieldsDiv.style.transform = 'translateY(0)';
-        }, 10);
+        });
     } else {
-        // Animation de disparition
         fieldsDiv.style.opacity = '0';
         fieldsDiv.style.transform = 'translateY(10px)';
-        
         setTimeout(() => {
             fieldsDiv.classList.add('hidden');
             fieldsDiv.style.opacity = '1';
             fieldsDiv.style.transform = 'translateY(0)';
-            // Nettoyer les champs
-            fieldsDiv.querySelectorAll('input, select').forEach(el => el.value = '');
-        }, 300);
+            // reset des champs de ce bloc
+            fieldsDiv.querySelectorAll('input, select, textarea').forEach(el => el.value = '');
+        }, 250);
     }
 }
 
-// Animation pour les sections du formulaire
 document.addEventListener('DOMContentLoaded', function() {
+    // Animation douce des sections
     const sections = document.querySelectorAll('div[class*="bg-"]');
-    
     sections.forEach((section, index) => {
         section.style.opacity = '0';
         section.style.transform = 'translateY(20px)';
         section.style.transition = 'all 0.4s ease';
-        
         setTimeout(() => {
             section.style.opacity = '1';
             section.style.transform = 'translateY(0)';
         }, 150 * (index + 1));
     });
-});
-document.addEventListener('DOMContentLoaded', function () {
+
+    // Afficher automatiquement les champs des produits déjà cochés (utile en édition/repost)
+    document.querySelectorAll('input[name="produits[]"]:checked').forEach(cb => {
+        const val = cb.value;
+        const block = document.getElementById(`fields-${val}`);
+        if (block) block.classList.remove('hidden');
+    });
+
+    // Validation simple des champs requis
     const form = document.querySelector("form");
     if (!form) return;
-
     form.addEventListener("submit", function (e) {
         let hasError = false;
         const requiredFields = form.querySelectorAll("input[required], select[required]");
-
         requiredFields.forEach(field => {
             const errorText = field.parentElement.querySelector(".error-message");
             if (errorText) errorText.remove();
-
             field.classList.remove("input-error");
-
             if (!field.value.trim()) {
                 hasError = true;
                 field.classList.add("input-error");
-
                 const msg = document.createElement("div");
                 msg.classList.add("error-message");
                 msg.innerText = "Ce champ est obligatoire.";
                 field.parentElement.appendChild(msg);
             }
         });
-
-        if (hasError) {
-            e.preventDefault();
-        }
+        if (hasError) e.preventDefault();
     });
 });
 </script>
 
 <style>
-    /* Animation pour les champs de formulaire */
-    input, select {
-        transition: all 0.2s ease;
-    }
-    
-    input:focus, select:focus {
-        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
-    }
-    
-    .dark input:focus, .dark select:focus {
-        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.3);
-    }
-    
-    /* Style pour les cases à cocher */
-    input[type="checkbox"] {
-        transition: all 0.2s ease;
-    }
-    
-    input[type="checkbox"]:checked {
-        transform: scale(1.1);
-    }
-    
-    /* Effet de survol pour les sections */
-    div[class*="bg-"] {
-        transition: transform 0.3s ease, box-shadow 0.3s ease;
-    }
-    
-    div[class*="bg-"]:hover {
-        transform: translateY(-3px);
-        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.05);
-    }
-    
-    .dark div[class*="bg-"]:hover {
-        box-shadow: 0 10px 20px rgba(255, 255, 255, 0.03);
-    }
-    
-    /* Style pour les boutons */
-    button, a[href] {
-        transition: all 0.3s ease;
-    }
-    
-    button:hover, a[href]:hover {
-        transform: translateY(-2px);
-    }
-    .input-error {
-        border-color: #dc2626 !important; /* rouge */
-        background-color: #fef2f2;
-    }
+    /* Animations et focus */
+    input, select { transition: all 0.2s ease; }
+    input:focus, select:focus { box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2); }
+    .dark input:focus, .dark select:focus { box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.3); }
 
-    .error-message {
-        color: #dc2626;
-        font-size: 0.875rem;
-        margin-top: 4px;
-    }
+    /* Checkboxes */
+    input[type="checkbox"] { transition: all 0.2s ease; }
+    input[type="checkbox"]:checked { transform: scale(1.1); }
+
+    /* Hover sections */
+    div[class*="bg-"] { transition: transform 0.3s ease, box-shadow 0.3s ease; }
+    div[class*="bg-"]:hover { transform: translateY(-3px); box-shadow: 0 10px 20px rgba(0,0,0,0.05); }
+    .dark div[class*="bg-"]:hover { box-shadow: 0 10px 20px rgba(255,255,255,0.03); }
+
+    /* Boutons */
+    button, a[href] { transition: all 0.3s ease; }
+    button:hover, a[href]:hover { transform: translateY(-2px); }
+
+    /* erreurs */
+    .input-error { border-color: #dc2626 !important; background-color: #fef2f2; }
+    .error-message { color: #dc2626; font-size: 0.875rem; margin-top: 4px; }
 </style>
 {% endblock %}

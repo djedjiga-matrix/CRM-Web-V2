@@ -1,4 +1,4 @@
-﻿import sys
+import sys
 from pathlib import Path
 
 # Ajoute la racine du projet (parent de "tests") au PYTHONPATH
