@@ -1,0 +1,13 @@
+# Bases & données locales
+*.db
+*.sqlite
+*.sqlite3
+Data/**/*.db
+*.bak
+*.tmp
+
+# DB files
+*.db
+*.sqlite
+*.sqlite3
+
