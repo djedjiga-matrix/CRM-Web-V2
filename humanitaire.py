@@ -9,6 +9,108 @@ from typing import List, Optional
 import pandas as pd
 import numpy as np
 
+
+def _parse_seuil(txt: str):
+    """
+    Convertit un texte du style '<4%' en 4.0
+    On suppose que B2:J2 ne contient que ce format.
+    """
+    if not txt:
+        return None
+    txt = str(txt).strip().replace(" ", "")
+    m = re.match(r"^<(\d+(?:[.,]\d+)?)%?$", txt)
+    if not m:
+        return None
+    val = m.group(1).replace(",", ".")
+    try:
+        return float(val)
+    except ValueError:
+        return None
+
+
+def calculer_chiffre_affaire_dyn(don_moyen: float,
+                                 tx_daccord: float,
+                                 total_don: int,
+                                 path_excel: str = "BDD QUALICONTACT.xlsx") -> float:
+    """
+    Règle demandée :
+    - lire B2:J2 = seuils sous forme <4%, <5%, <6%...
+    - prendre le PREMIER seuil strictement supérieur au taux réel (en %)
+    - trouver la ligne dont la colonne A == don_moyen (ou la plus proche)
+    - CA = valeur trouvée * total_don
+    """
+    if total_don <= 0:
+        return 0.0
+
+    if not os.path.exists(path_excel):
+        print(f"[CA] Fichier introuvable : {path_excel}")
+        return 0.0
+
+    # on lit sans header pour pouvoir pointer par index
+    df = pd.read_excel(path_excel, header=None)
+
+    # 1) récupérer les seuils en ligne 1 (Excel ligne 2)
+    # A1 = vide, B1.. = seuils
+    seuils = []
+    for col in range(1, df.shape[1]):  # à partir de B
+        val = df.iloc[1, col]  # ligne 1 → Excel ligne 2
+        parsed = _parse_seuil(val)
+        if parsed is not None:
+            seuils.append((col, parsed))  # (index_col, 4.0)
+    if not seuils:
+        print("[CA] Aucun seuil reconnu en ligne 2 (B2:J2).")
+        return 0.0
+
+    # 2) choisir la colonne qui a le premier seuil > taux réel
+    tx_pct = tx_daccord * 100.0
+    chosen_col = None
+    for col_idx, seuil_val in seuils:
+        if tx_pct < seuil_val:
+            chosen_col = col_idx
+            break
+    # si le taux dépasse tous les seuils -> on prend le dernier seuil
+    if chosen_col is None:
+        chosen_col = seuils[-1][0]
+
+    # 3) trouver la ligne du don moyen dans la colonne A (col 0)
+    # les valeurs commencent à la ligne 2 (Excel ligne 3) d’après ce que tu décris
+    best_row = None
+    best_diff = None
+    for row in range(2, df.shape[0]):  # à partir de ligne 2
+        raw = df.iloc[row, 0]
+        if pd.isna(raw):
+            continue
+        # nettoyer "40€" → 40
+        raw_str = str(raw).replace("€", "").replace(",", ".").strip()
+        try:
+            val = float(raw_str)
+        except ValueError:
+            continue
+        diff = abs(val - don_moyen)
+        if best_diff is None or diff < best_diff:
+            best_diff = diff
+            best_row = row
+
+    if best_row is None:
+        print("[CA] Aucun don moyen trouvé en colonne A.")
+        return 0.0
+
+    # 4) lire la cellule (row, chosen_col)
+    cell_val = df.iloc[best_row, chosen_col]
+    if pd.isna(cell_val):
+        return 0.0
+
+    # nettoyer la valeur (€ éventuel)
+    cell_str = str(cell_val).replace("€", "").replace(",", ".").strip()
+    try:
+        montant_unitaire = float(cell_str)
+    except ValueError:
+        montant_unitaire = 0.0
+
+    ca = montant_unitaire * total_don
+    print(f"[CA] taux={tx_pct:.2f}% → col {chosen_col} | don_moyen≈{don_moyen} → ligne {best_row} | unit={montant_unitaire} → CA={ca}")
+    return ca
+
 # ──────────────────────────────────────────────────────────────────────────────
 # Config par défaut (surcharges via variables d'environnement)
 # ──────────────────────────────────────────────────────────────────────────────

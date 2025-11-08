@@ -1,15 +1,18 @@
-# etl_incremental.py — Import incrémental quotidien pour humanitaire/CRM (v3, avec auto-migration colonnes)
+# etl_incremental.py — Import incrémental quotidien pour humanitaire/CRM
 # - Création/migration schéma (tables + colonnes manquantes) + backfill row_key + dédup
 # - Journal import (import_log) + index uniques
-# - Lecture AUTO CSV/Excel, skip non tabulaires et GRH côté appels
+# - Lecture AUTO CSV/Excel
 # - Normalisation + détection robuste statuts (don/don_mail/indécis/refus)
 # - Logs pour lignes ignorées et montants invalides
 
-import os, glob, hashlib, sqlite3, argparse, re, unicodedata
+import os, glob, hashlib, sqlite3, argparse, re, unicodedata, csv, shutil
 from datetime import datetime
 import pandas as pd
+import chardet  # pip install chardet si non installé
 
-# ---------- Utils ----------
+# ======================================================================
+# UTILS GÉNÉRIQUES
+# ======================================================================
 def file_sha1(path: str) -> str:
     h = hashlib.sha1()
     with open(path, "rb") as f:
@@ -31,14 +34,17 @@ def normalize_text(s: str) -> str:
 def to_iso(d):
     if pd.isna(d):
         return None
+    s = str(d).strip()
+    # si format "2025-09-15 14:02:33"
     try:
-        return pd.to_datetime(d).date().isoformat()
+        return pd.to_datetime(s).date().isoformat()
     except Exception:
-        for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y", "%m/%d/%Y"):
-            try:
-                return datetime.strptime(str(d), fmt).date().isoformat()
-            except Exception:
-                continue
+        pass
+    for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y", "%m/%d/%Y", "%d.%m.%Y"):
+        try:
+            return datetime.strptime(s, fmt).date().isoformat()
+        except Exception:
+            continue
     return None
 
 def as_float(v, default=0.0):
@@ -48,76 +54,96 @@ def as_float(v, default=0.0):
     except Exception:
         return default
 
-def safe_float_with_log(v, context_row, default=0.0):
-    s = str(v).replace(",", ".").strip()
-    if s == "":
-        return 0.0
-    try:
-        return float(s)
-    except Exception:
-        print(f"[ALERTE] Montant invalide '{s}' pour ligne: {context_row}")
-        return default
-
-def rowkey_call(call_date, base, agent, is_cu, is_don, is_donmail, is_indecis, montant):
-    raw = f"{call_date}|{base}|{agent}|{is_cu}|{is_don}|{is_donmail}|{is_indecis}|{montant}"
+def rowkey_call(call_date, base, agent, lib_status, montant):
+    raw = f"{call_date}|{base}|{agent}|{lib_status}|{montant}"
     return hashlib.sha1(raw.encode("utf-8")).hexdigest()
 
 def rowkey_grh(jour, agent, heures):
     raw = f"{jour}|{agent}|{heures}"
     return hashlib.sha1(raw.encode("utf-8")).hexdigest()
 
-# ---------- Détection statuts ----------
-_KEYWORDS = {
-    "don": [
-        r"\bdon\b", r"\bok\b", r"\boui\b", r"\baccepte\b", r"\bvalide\b",
-        r"\biban\b", r"\bsepa\b", r"\bprelevement\b", r"\bprlvt\b", r"\bdam\b",
-        r"\bdon avec montant\b"
-    ],
-    "don_mail": [r"\bmail\b", r"\bemail\b", r"\ben ligne\b", r"\bweb\b", r"\blien de don\b"],
-    "indecis": [r"\bindecis\b", r"\breflech", r"\brappel\b", r"\bvoir\b"],
-    "refus": [r"\brefus\b", r"\bnon\b", r"\bpas interesse\b", r"\braccroche\b", r"\bne veux pas\b"],
-}
-_COMPILED = {k: [re.compile(p) for p in v] for k, v in _KEYWORDS.items()}
+# PETITES FONCTIONS POUR LE DASHBOARD
+# =====================================================================
+def _parse_date_safe(val: str | None):
+    if not val:
+        return None
+    try:
+        return datetime.strptime(val, "%Y-%m-%d").date()
+    except Exception:
+        return None
 
-def detect_status(text: str) -> str:
-    txt = normalize_text(text)
-    if not txt:
-        return "inconnu"
-    for label, patterns in _COMPILED.items():
-        for pat in patterns:
-            if pat.search(txt):
-                return label
-    return "autre"
+def query_dashboard(con, start_date: str | None = None, end_date: str | None = None):
+    where = ["1=1"]
+    params = []
+    if start_date:
+        where.append("call_date >= ?")
+        params.append(start_date)
+    if end_date:
+        where.append("call_date <= ?")
+        params.append(end_date)
 
-# ---------- Schéma / Migration ----------
+    sql = f"""
+    WITH base_calls AS (
+      SELECT agent,
+             SUM(COALESCE(is_cu,0))      AS Cu,
+             SUM(COALESCE(is_don,0))     AS Don,
+             SUM(COALESCE(is_donmail,0)) AS Don_en_ligne,
+             SUM(COALESCE(is_indecis,0)) AS Indecis,
+             SUM(COALESCE(montant,0))    AS Montant_Don,
+             COUNT(*)                    AS Fich_T
+      FROM calls
+      WHERE {' AND '.join(where)}
+      GROUP BY agent
+    ),
+    heures AS (
+      SELECT agent, SUM(COALESCE(heures,0)) AS Heur_Prod
+      FROM grh_hours
+      GROUP BY agent
+    )
+    SELECT
+      b.agent AS TV,
+      COALESCE(h.Heur_Prod,0.0) AS Heur_Prod,
+      b.Cu, b.Don, b.Don_en_ligne AS Don_en_ligne, b.Indecis, b.Montant_Don, b.Fich_T,
+      CASE WHEN (b.Don + b.Don_en_ligne)>0
+           THEN b.Montant_Don*1.0/(b.Don + b.Don_en_ligne) ELSE 0 END AS Don_Moyen,
+      CASE WHEN b.Cu>0 THEN (b.Don + b.Don_en_ligne)*1.0/b.Cu ELSE 0 END AS Tx_daccord,
+      CASE WHEN COALESCE(h.Heur_Prod,0)>0 THEN b.Cu*1.0/COALESCE(h.Heur_Prod,0) ELSE 0 END AS Cu_h
+    FROM base_calls b
+    LEFT JOIN heures h ON h.agent = b.agent
+    ORDER BY TV ASC;
+    """
+    return pd.read_sql_query(sql, con, params=params)
+
+# ======================================================================
+# SCHÉMA / MIGRATION (UNE SEULE VERSION)
+# ======================================================================
 def _table_has_column(con: sqlite3.Connection, table: str, col: str) -> bool:
     cur = con.execute(f"PRAGMA table_info({table})")
     return any(r[1].lower() == col.lower() for r in cur.fetchall())
 
 def _ensure_column(con: sqlite3.Connection, table: str, col: str, decl: str, default_sql: str | None = None):
-    """Ajoute la colonne si manquante. decl = 'TEXT', 'INTEGER DEFAULT 0', etc."""
     if not _table_has_column(con, table, col):
-        sql = f"ALTER TABLE {table} ADD COLUMN {col} {decl}"
-        con.execute(sql)
+        con.execute(f"ALTER TABLE {table} ADD COLUMN {col} {decl}")
         if default_sql is not None:
             con.execute(f"UPDATE {table} SET {col} = {default_sql} WHERE {col} IS NULL")
         con.commit()
-        print(f"[MIGRATION] + colonne {table}.{col} ({decl})")
+        print(f"[MIGRATION] + colonne {table}.{col}")
 
 def _dedup_by_rowkey(con: sqlite3.Connection, table: str):
-    cur = con.cursor()
-    cur.execute(f"""
+    con.execute(f"""
         DELETE FROM {table}
-         WHERE rowid NOT IN (
-           SELECT MIN(rowid) FROM {table}
-           GROUP BY row_key
-         )
+        WHERE rowid NOT IN (
+          SELECT MIN(rowid) FROM {table} GROUP BY row_key
+        )
     """)
     con.commit()
 
 def ensure_schema_incremental(con: sqlite3.Connection):
+    """
+    Crée les tables minimales et garantit que toutes les colonnes attendues
+    par l'import existent (calls, grh_hours, import_log).
+    """
     cur = con.cursor()
-    # Crée les tables si absentes (schéma "cible" minimal)
     cur.executescript("""
     CREATE TABLE IF NOT EXISTS calls (
         id INTEGER PRIMARY KEY AUTOINCREMENT
@@ -134,41 +160,48 @@ def ensure_schema_incremental(con: sqlite3.Connection):
     """)
     con.commit()
 
-    # Garantir toutes les colonnes de calls
+    # calls : toutes les colonnes qu'on utilise vraiment
     _ensure_column(con, "calls", "call_date", "TEXT")
     _ensure_column(con, "calls", "base", "TEXT")
     _ensure_column(con, "calls", "agent", "TEXT")
+    _ensure_column(con, "calls", "lib_status", "TEXT")
+    _ensure_column(con, "calls", "don_raw", "REAL", "0")
     _ensure_column(con, "calls", "is_cu", "INTEGER DEFAULT 0", "0")
     _ensure_column(con, "calls", "is_don", "INTEGER DEFAULT 0", "0")
     _ensure_column(con, "calls", "is_donmail", "INTEGER DEFAULT 0", "0")
     _ensure_column(con, "calls", "is_indecis", "INTEGER DEFAULT 0", "0")
     _ensure_column(con, "calls", "montant", "REAL DEFAULT 0", "0")
+
     if not _table_has_column(con, "calls", "row_key"):
-        con.execute("ALTER TABLE calls ADD COLUMN row_key TEXT")
-        con.commit()
-        # Backfill row_key existant
+        _ensure_column(con, "calls", "row_key", "TEXT")
+        # backfill
         rows = cur.execute("""
-            SELECT id, COALESCE(call_date,''), COALESCE(base,''), COALESCE(agent,''),
-                   COALESCE(is_cu,0), COALESCE(is_don,0), COALESCE(is_donmail,0),
-                   COALESCE(is_indecis,0), COALESCE(montant,0.0)
+            SELECT id,
+                   COALESCE(call_date,''),
+                   COALESCE(base,''),
+                   COALESCE(agent,''),
+                   COALESCE(lib_status,''),
+                   COALESCE(montant,0)
             FROM calls
             WHERE row_key IS NULL OR row_key=''
         """).fetchall()
-        for rid, d, b, a, cu, dn, dm, indec, m in rows:
-            rk = rowkey_call(d, b, a, cu, dn, dm, indec, m)
+        for rid, d, b, a, ls, m in rows:
+            rk = rowkey_call(d, b, a, ls, m)
             cur.execute("UPDATE calls SET row_key=? WHERE id=?", (rk, rid))
         con.commit()
         _dedup_by_rowkey(con, "calls")
 
-    # Garantir toutes les colonnes de grh_hours
+    # grh_hours
     _ensure_column(con, "grh_hours", "jour", "TEXT")
     _ensure_column(con, "grh_hours", "agent", "TEXT")
     _ensure_column(con, "grh_hours", "heures", "REAL DEFAULT 0", "0")
     if not _table_has_column(con, "grh_hours", "row_key"):
-        con.execute("ALTER TABLE grh_hours ADD COLUMN row_key TEXT")
-        con.commit()
+        _ensure_column(con, "grh_hours", "row_key", "TEXT")
         rows = cur.execute("""
-            SELECT id, COALESCE(jour,''), COALESCE(agent,''), COALESCE(heures,0.0)
+            SELECT id,
+                   COALESCE(jour,''),
+                   COALESCE(agent,''),
+                   COALESCE(heures,0)
             FROM grh_hours
             WHERE row_key IS NULL OR row_key=''
         """).fetchall()
@@ -178,12 +211,27 @@ def ensure_schema_incremental(con: sqlite3.Connection):
         con.commit()
         _dedup_by_rowkey(con, "grh_hours")
 
-    # Index
+    # index
     cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS ux_calls_rowkey ON calls(row_key)")
     cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS ux_grh_rowkey ON grh_hours(row_key)")
     cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS ux_importlog_sha1 ON import_log(file_sha1)")
     con.commit()
 
+def ensure_huma_schema(db_path: str):
+    """
+    Point d'entrée : crée le fichier et lance la migration incrémentale.
+    """
+    os.makedirs(os.path.dirname(db_path) or ".", exist_ok=True)
+    con = sqlite3.connect(db_path)
+    con.execute("PRAGMA journal_mode=WAL;")
+    ensure_schema_incremental(con)
+    con.close()
+    print(f"[SCHEMA] Base '{db_path}' verifiée / créée.")
+
+
+# ======================================================================
+# IMPORT LOG
+# ======================================================================
 def already_imported(con: sqlite3.Connection, file_path: str) -> bool:
     sha1 = file_sha1(file_path)
     row = con.execute("SELECT 1 FROM import_log WHERE file_sha1=?", (sha1,)).fetchone()
@@ -191,243 +239,306 @@ def already_imported(con: sqlite3.Connection, file_path: str) -> bool:
 
 def mark_imported(con: sqlite3.Connection, file_path: str):
     sha1 = file_sha1(file_path)
-    con.execute("INSERT OR IGNORE INTO import_log(file_path, file_sha1, imported_at) VALUES (?,?,?)",
-                (file_path, sha1, datetime.now().isoformat(timespec="seconds")))
+    con.execute(
+        "INSERT OR IGNORE INTO import_log(file_path, file_sha1, imported_at) VALUES (?,?,?)",
+        (file_path, sha1, datetime.now().isoformat(timespec="seconds"))
+    )
     con.commit()
 
-# ---------- Lecture fichiers ----------
+# ======================================================================
+# HELPERS LECTURE
+# ======================================================================
 SUPPORTED_EXT = {".csv", ".xlsx", ".xls"}
 
-def _should_skip_for_appels(path: str) -> bool:
-    name = os.path.basename(path).lower()
-    if any(name.endswith(ext) for ext in [".png", ".jpg", ".jpeg", ".db", ".pdf"]):
-        return True
-    if "grh" in name or "extract_grh" in name or "heure" in name or "prod" in name:
-        return True
-    return False
+def _extract_base_from_filename(path: str) -> str:
+    # Exemple: IMA5025P_20251006.csv -> IMA5025P
+    name = os.path.basename(path)
+    base = name.split("_")[0].split(".")[0]
+    return base.upper()
 
-def _read_table_auto(path: str) -> pd.DataFrame:
-    ext = os.path.splitext(path)[1].lower()
-    if ext not in SUPPORTED_EXT:
-        raise ValueError(f"Extension non supportée: {ext}")
-    if ext == ".csv":
-        try:
-            return pd.read_csv(path, sep=None, engine="python", encoding="utf-8-sig")
-        except Exception:
-            return pd.read_csv(path, sep=";", encoding="utf-8-sig")
-    else:
-        return pd.read_excel(path, engine="openpyxl")
-
-# ---------- Helpers lecture fichiers ----------
-def _looks_like_grh(df: pd.DataFrame) -> bool:
-    low = [str(c).strip().lower() for c in df.columns]
-    # signaux typiques des exports de présence/horaires
-    hints = ["heure prod", "heure présence", "agents", "h9 -10h", "h10 -11h", "durée conversation"]
-    return any(h in " ".join(low) for h in hints)
-
-
-def _read_any_table(path: str) -> pd.DataFrame:
-    ext = os.path.splitext(path)[1].lower()
-    if ext in [".xlsx", ".xls"]:
-        return pd.read_excel(path, engine="openpyxl")
-    if ext in [".csv", ".txt"]:
-        # try ; then , + encodings
-        for sep in [";", ",", "\t"]:
-            for enc in ["utf-8-sig", "latin1"]:
-                try:
-                    return pd.read_csv(path, sep=sep, encoding=enc)
-                except Exception:
-                    continue
-        # dernier essai sans sep (pandas auto)
-        return pd.read_csv(path, encoding="utf-8-sig")
-    # Fichiers non data : on renvoie DataFrame vide
-    return pd.DataFrame()
-
-
-# ---------- Import Appels (robuste CSV + Excel) ----------
-def import_appels_incremental(con: sqlite3.Connection, glob_pattern: str) -> int:
+# ======================================================================
+# IMPORT APPELS (ROBUSTE)
+# ======================================================================
+def import_appels_incremental(
+    con: sqlite3.Connection,
+    glob_pattern: str,
+    archive_dir: str | None = None,
+) -> int:
     files = glob.glob(glob_pattern)
     if not files:
         print(f"[APPELS] Aucun fichier pour {glob_pattern}")
         return 0
 
+    if archive_dir:
+        os.makedirs(archive_dir, exist_ok=True)
 
     total_new = 0
     for path in files:
-        ext = os.path.splitext(path)[1].lower()
-        base_name = os.path.basename(path)
-
-
-        # skip fichiers manifestement non utiles
-        if ext in [".db", ".sqlite", ".sqlite3"]:
-            print(f"[APPELS] (skip) fichier base de données : {base_name}")
-            continue
-        if "extract_grh" in base_name.lower():
-            print(f"[APPELS] (skip) fichier GRH détecté : {base_name}")
-            continue
-
+        # on s’appuie sur le sha1 du fichier → chaque fichier du jour = identifiant unique
+        file_hash = file_sha1(path)
+        inserted_for_file = 0
 
         try:
-            if already_imported(con, path):
-                print(f"[APPELS] (skip) déjà importé : {base_name}")
-                continue
+            with open(path, "rb") as f:
+                raw = f.read(50000)
+                det = chardet.detect(raw)
+                enc = det["encoding"] or "utf-8"
 
-
-            df = _read_any_table(path)
+            ext = os.path.splitext(path)[1].lower()
+            if ext == ".csv":
+                df = pd.read_csv(path, encoding=enc, sep=";", dtype=str, keep_default_na=False)
+            else:
+                df = pd.read_excel(path, engine="openpyxl", dtype=str)
+            df.columns = [c.strip() for c in df.columns]
         except Exception as e:
             print(f"[APPELS] Erreur lecture {path}: {e}")
             continue
 
+        cols = {c.lower(): c for c in df.columns}
 
-        if df.empty:
-            print(f"[APPELS] (skip) vide ou non lisible : {base_name}")
-            continue
+        # colonne INDICE (présente partout chez toi)
+        key_indice = cols.get("indice")
 
+        # autres colonnes
+        key_base = cols.get("base") or cols.get("campagne") or cols.get("nom_base")
+        key_agent = (
+            cols.get("agent")
+            or cols.get("tv")
+            or cols.get("operateur")
+            or cols.get("agents login")
+            or cols.get("agent_login")
+            or cols.get("agents_login")
+        )
+        key_date = (
+            cols.get("date")
+            or cols.get("call_date")
+            or cols.get("jour")
+            or cols.get("date appel")
+            or cols.get("date_appel")
+        )
+        key_status = (
+            cols.get("lib_status")
+            or cols.get("lib statut")
+            or cols.get("lib_statut")
+            or cols.get("statut")
+            or cols.get("status")
+        )
+        key_montant = cols.get("don") or cols.get("montant") or cols.get("montant_don")
 
-        # Ignore les fichiers GRH mal dirigés
-        if _looks_like_grh(df):
-            print(f"[APPELS] (skip) détecté comme GRH : {base_name}")
-            continue
+        fallback_base = _extract_base_from_filename(path)
 
+        for idx, r in df.iterrows():
+            base = norm_str(r.get(key_base)) if key_base else fallback_base
+            agent = norm_str(r.get(key_agent)) if key_agent else "INCONNU"
+            date_raw = norm_str(r.get(key_date)) if key_date else ""
+            call_date = to_iso(date_raw)
+            lib_status = norm_str(r.get(key_status)) if key_status else ""
+            montant = as_float(r.get(key_montant), 0.0) if key_montant else 0.0
 
-        # Normalise colonnes et détecte
-        cols_map = {str(c).strip().lower(): c for c in df.columns}
-        key_agent = cols_map.get("agent") or cols_map.get("tv") or cols_map.get("agents") or "agent"
-        # dates possibles
-        key_date = (cols_map.get("date") or cols_map.get("call_date") or cols_map.get("jour")
-                    or cols_map.get("date_appel") or cols_map.get("calldate") or "date")
-        # base/campagne
-        key_base = (cols_map.get("base") or cols_map.get("campagne") or cols_map.get("campaign")
-                    or cols_map.get("operation") or "base")
-        # statut/typage
-        key_type = (cols_map.get("type") or cols_map.get("statut") or cols_map.get("lib_status")
-                    or cols_map.get("lib statut") or cols_map.get("status"))
-        # montant
-        key_montant = (cols_map.get("montant") or cols_map.get("montant_don") or cols_map.get("don")
-                       or cols_map.get("amount") or "montant")
-
-
-        insert_rows = []
-        for _, r in df.iterrows():
-            agent = norm_str(r.get(key_agent)) if key_agent in df.columns else ""
-            call_d = to_iso(r.get(key_date)) if key_date in df.columns else None
-            base   = norm_str(r.get(key_base)).upper() if key_base in df.columns else ""
-
-
-            # Statut → flags
-            s_all = norm_str(r.get(key_type)).lower() if key_type in df.columns else ""
-            is_donmail = int(any(x in s_all for x in ["don mail", "don en ligne", "email", "lien de don", "paylink"]))
-            is_don = 0
-            if not is_donmail:
-                is_don = int(any(x in s_all for x in ["iban", "sepa", "prélèvement", "prelevement", "dam", "don avec montant", "ok iban", "ok sepa"]))
-            is_indecis = int(any(x in s_all for x in ["indecis", "indécis", "rappel", "hesite"]))
-            # Un "Cu" = toute issue qualifiée (don, don mail, indécis, refus)
-            is_cu = int(bool(is_don or is_donmail or is_indecis or ("refus" in s_all or "ko" in s_all)))
-
-
-            montant = 0.0
-            if key_montant in df.columns:
-                montant = as_float(r.get(key_montant), 0.0)
-
-
-            # Lignes minimales valides
-            if not agent or not call_d:
+            # minimum vital
+            if not base or not call_date:
                 continue
 
+            # ✅ on force le montant uniquement pour ces statuts
+            DON_STATUTS_STRICT = (
+                "dam don avec montant",
+                "don par email",
+                "pam pa mensuel",
+                "pat pa trimestriel",
+            )
+            ls_norm = lib_status.lower()
+            if ls_norm not in DON_STATUTS_STRICT:
+                montant = 0.0
 
-            rk = rowkey_call(call_d, base, agent, is_cu, is_don, is_donmail, is_indecis, montant)
-            insert_rows.append((call_d, base, agent, is_cu, is_don, is_donmail, is_indecis, montant, rk))
+            # ✅ ici on différencie clairement fichiers d'une même date
+            if key_indice:
+                indice_val = norm_str(r.get(key_indice))
+                row_key = hashlib.sha1(f"{file_hash}|{indice_val}".encode("utf-8")).hexdigest()
+            else:
+                # secours si un jour il y a un fichier sans INDICE
+                row_key = hashlib.sha1(
+                    f"{call_date}|{base}|{agent}|{lib_status}|{montant}|{idx}".encode("utf-8")
+                ).hexdigest()
 
+            # flags (ls_norm déjà défini ci-dessus)
+            is_don = int(any(x in ls_norm for x in [
+                "don avec montant", "don par email", "pam pa mensuel",
+                "pat pa trimestriel", "dam"
+            ]))
+            is_cu = int(any(x in ls_norm for x in [
+                "ref refus", "dam don avec montant", "indécis", "indecis",
+                "don par email", "pam pa mensuel", "pat pa trimestriel"
+            ]))
+            is_donmail = int("mail" in ls_norm or "email" in ls_norm or "en ligne" in ls_norm)
+            is_indecis = int("indécis" in ls_norm or "indecis" in ls_norm or "rappel" in ls_norm)
 
-        if insert_rows:
-            cur = con.cursor()
-            cur.executemany("""
-                INSERT OR IGNORE INTO calls
-                (call_date, base, agent, is_cu, is_don, is_donmail, is_indecis, montant, row_key)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, insert_rows)
-            con.commit()
-            added = cur.rowcount if cur.rowcount is not None else 0
-            total_new += added
-            if added > 0:
-                mark_imported(con, path)  # on ne marque que si on a vraiment ajouté
-            print(f"[APPELS] +{added} nouvelles lignes depuis {base_name}")
-        else:
-            print(f"[APPELS] 0 ligne exploitable dans {base_name} (non marqué importé)")
+            try:
+                con.execute("""
+                    INSERT INTO calls
+                    (call_date, base, agent, lib_status, don_raw,
+                     is_cu, is_don, is_donmail, is_indecis, montant, row_key)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    call_date, base, agent, lib_status, montant,
+                    is_cu, is_don, is_donmail, is_indecis, montant, row_key
+                ))
+                inserted_for_file += 1
+            except sqlite3.IntegrityError:
+                # même fichier + même indice → normal
+                continue
 
+        con.commit()
+        mark_imported(con, path)
+        print(f"[APPELS] {os.path.basename(path)} | inserees={inserted_for_file}")
+        total_new += inserted_for_file
 
-    print(f"[APPELS] ✅ Nouvelles lignes totales: {total_new}")
+        if archive_dir and inserted_for_file > 0:
+            base_name = os.path.basename(path)
+            stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            dest = os.path.join(archive_dir, f"{stamp}_{base_name}")
+            try:
+                shutil.move(path, dest)
+                print(f"[APPELS] Archivé → {dest}")
+            except Exception as e:
+                print(f"[APPELS] ⚠️ Impossible d'archiver {path}: {e}")
+
+    print(f"[APPELS] ✅ Total insérées≈{total_new}")
     return total_new
 
-# ---------- Import GRH ----------
+
+# ======================================================================
+# IMPORT GRH
+# ======================================================================
+def _parse_sheet_date(sheet_name: str) -> str | None:
+    """
+    Les feuilles s'appellent '2025-11-03', '2025-11-04', etc.
+    On les transforme en '2025-11-03'
+    """
+    s = sheet_name.strip()
+    for fmt in ("%Y-%m-%d", "%d-%m-%Y", "%d/%m/%Y", "%Y/%m/%d"):
+        try:
+            return datetime.strptime(s, fmt).date().isoformat()
+        except Exception:
+            continue
+    return None
+
+def _hms_to_hours(s: str) -> float:
+    """
+    '03:36:05' -> 3.6014 h
+    gère aussi le cas où il y a un ' devant
+    """
+    if not s or not isinstance(s, str):
+        return 0.0
+    s = s.strip().strip("'")
+    parts = s.split(":")
+    if len(parts) != 3:
+        return 0.0
+    try:
+        h, m, sec = [int(x) for x in parts]
+        return h + m/60 + sec/3600
+    except Exception:
+        return 0.0
+
 def import_grh_incremental(con: sqlite3.Connection, glob_pattern: str) -> int:
     files = glob.glob(glob_pattern)
     if not files:
-        print(f"[GRH] Aucun fichier pour {glob_pattern}")
+        print(f"[GRH] Aucun fichier trouvé pour {glob_pattern}")
         return 0
 
     total_new = 0
     for path in files:
         try:
-            if already_imported(con, path):
-                print(f"[GRH] (skip) déjà importé : {os.path.basename(path)}")
-                continue
-            df = _read_table_auto(path)
+            xls = pd.ExcelFile(path, engine="openpyxl")
         except Exception as e:
-            print(f"[GRH] Erreur lecture {path}: {e}")
+            print(f"[GRH] Erreur ouverture {path}: {e}")
             continue
 
-        cols = {c.lower().strip(): c for c in df.columns}
-        key_date   = cols.get("date") or cols.get("jour") or "date"
-        key_agent  = cols.get("agent") or cols.get("tv") or "agent"
-        key_heures = cols.get("heures") or cols.get("heur prod") or cols.get("h_prod") or "heures"
+        print(f"[GRH] Lecture fichier: {os.path.basename(path)} ({len(xls.sheet_names)} jours)")
 
-        insert_rows = []
-        for _, r in df.iterrows():
-            jour  = to_iso(r.get(key_date) if key_date in df.columns else None)
-            agent = norm_str(r.get(key_agent) if key_agent in df.columns else "")
-            h     = as_float(r.get(key_heures) if key_heures in df.columns else 0.0, 0.0)
-            if not jour or not agent or h <= 0:
+        for sheet_name in xls.sheet_names:
+            # 1) la date est dans le nom de la feuille
+            jour_iso = _parse_sheet_date(sheet_name)
+            if not jour_iso:
+                print(f"  ⚠️ Onglet ignoré : '{sheet_name}' (non reconnu comme date)")
                 continue
-            rk = rowkey_grh(jour, agent, h)
-            insert_rows.append((jour, agent, h, rk))
 
-        if insert_rows:
-            cur = con.cursor()
-            cur.executemany("""
-                INSERT OR IGNORE INTO grh_hours (jour, agent, heures, row_key)
-                VALUES (?, ?, ?, ?)
-            """, insert_rows)
+            # 2) les en-têtes sont à la ligne 7 => header=6
+            try:
+                df = pd.read_excel(xls, sheet_name=sheet_name, header=6)
+            except Exception as e:
+                print(f"  ⚠️ Erreur lecture '{sheet_name}': {e}")
+                continue
+
+            # 3) on cherche exactement “Agents” et “Heure Prod”
+            cols = {str(c).strip().lower(): c for c in df.columns}
+            key_agent = cols.get("agents")
+            key_heure_prod = cols.get("heure prod")
+
+            if not key_agent or not key_heure_prod:
+                print(f"  ⚠️ '{sheet_name}': colonnes 'Agents' ou 'Heure Prod' introuvables")
+                continue
+
+            inserted_for_sheet = 0
+            for _, r in df.iterrows():
+                agent = (str(r.get(key_agent)) or "").strip()
+                if not agent:
+                    continue
+
+                heure_raw = r.get(key_heure_prod)
+                # peut être une str "03:36:05"
+                if isinstance(heure_raw, str):
+                    heures = _hms_to_hours(heure_raw)
+                else:
+                    # au cas où pandas lit un nombre
+                    try:
+                        heures = float(heure_raw)
+                    except Exception:
+                        heures = 0.0
+
+                if heures <= 0:
+                    continue
+
+                # row_key pour éviter les doublons
+                rk = rowkey_grh(jour_iso, agent, heures)
+
+                try:
+                    con.execute("""
+                        INSERT INTO grh_hours (jour, agent, heures, row_key)
+                        VALUES (?, ?, ?, ?)
+                    """, (jour_iso, agent, heures, rk))
+                    inserted_for_sheet += 1
+                    total_new += 1
+                except sqlite3.IntegrityError:
+                    # déjà inséré
+                    continue
+
             con.commit()
-            added = cur.rowcount if cur.rowcount is not None else 0
-            total_new += added
-            print(f"[GRH] +{added} nouvelles lignes depuis {os.path.basename(path)}")
-        else:
-            print(f"[GRH] 0 ligne exploitable dans {os.path.basename(path)}")
+            print(f"  ✅ {sheet_name} | {inserted_for_sheet} lignes insérées")
 
-        mark_imported(con, path)
-
-    print(f"[GRH] ✅ Nouvelles lignes totales: {total_new}")
+    print(f"[GRH] ✅ Total global inséré : {total_new}")
     return total_new
 
-# ---------- Main ----------
+# ======================================================================
+# MAIN
+# ======================================================================
 if __name__ == "__main__":
-    ap = argparse.ArgumentParser(description="Import incrémental appels + GRH (auto CSV/Excel, détection robuste, migration colonnes)")
+    ap = argparse.ArgumentParser(description="Import incrémental appels + GRH (avec migration row_key)")
     ap.add_argument("--db", required=True, help="humanitaire.db ou crm_clients.db")
-    ap.add_argument("--appels", required=True, help="Glob des fichiers d'appels (ex: Data\\HIM*.csv ; Data\\IMA*.csv ; Appels*.xlsx)")
-    ap.add_argument("--grh",    required=True, help="Glob des fichiers GRH (ex: Data\\extract_grh*.xlsx)")
+    ap.add_argument("--appels", required=True, help="Glob des fichiers d'appels")
+    ap.add_argument("--grh",    required=True, help="Glob des fichiers GRH")
     args = ap.parse_args()
 
-    os.makedirs(os.path.dirname(args.db) or ".", exist_ok=True)
+    # création / migration
+    ensure_huma_schema(args.db)
+
     con = sqlite3.connect(args.db)
     con.execute("PRAGMA journal_mode=WAL;")
-
-    ensure_schema_incremental(con)
 
     print(f"[RUN] DB={args.db}")
     n1 = import_appels_incremental(con, args.appels)
     n2 = import_grh_incremental(con, args.grh)
 
+    # recap
     cur = con.cursor()
     calls = cur.execute("SELECT COUNT(*) FROM calls").fetchone()[0]
     hrs   = cur.execute("SELECT COUNT(*) FROM grh_hours").fetchone()[0]

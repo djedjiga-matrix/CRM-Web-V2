@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% block title %}Dashboard Agents Humanitaire{% endblock %}
+{% block header_title %}Dashboard Agents Humanitaire{% endblock %}
+
+{% block content %}
+<div class="max-w-full mx-auto px-4 sm:px-6 py-6">
+  <!-- En-tête -->
+  <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+    <div>
+      <h1 class="text-2xl font-bold text-gray-800 dark:text-white">Statistiques par agent (TV)</h1>
+      <p class="text-gray-600 dark:text-gray-300">Dernière mise à jour : {{ auj }}</p>
+    </div>
+
+    <!-- Filtres -->
+    <form method="get" action="{{ url_for('dashboard_huma_agents') }}" class="flex flex-wrap items-center gap-2">
+      <input type="date" name="debut" value="{{ debut }}" class="border rounded px-3 py-2 dark:bg-dark-800 dark:text-white">
+      <input type="date" name="fin" value="{{ fin }}" class="border rounded px-3 py-2 dark:bg-dark-800 dark:text-white">
+      <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded">Filtrer</button>
+      <a href="{{ url_for('dashboard_huma_agents', debut=debut, fin=fin, export='csv') }}"
+         class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded">
+        <i class="fas fa-file-csv mr-2"></i>Export CSV
+      </a>
+    </form>
+  </div>
+
+  {% if rows_agents %}
+  <!-- Tableau principal -->
+  <div class="bg-white dark:bg-dark-800 rounded-xl shadow overflow-x-auto">
+    <table class="min-w-full text-sm">
+      <thead class="bg-gray-50 dark:bg-dark-700 text-gray-700 dark:text-gray-200">
+        <tr>
+          <th class="px-4 py-3 text-left">
+            <a href="{{ url_for('dashboard_huma_agents', debut=debut, fin=fin, sort='agent', dir='asc' if sort!='agent' or dir=='desc' else 'desc') }}">
+              TV
+            </a>
+          </th>
+          <th class="px-4 py-3 text-right">
+            <a href="{{ url_for('dashboard_huma_agents', debut=debut, fin=fin, sort='Heur_de_prod', dir='asc' if sort!='Heur_de_prod' or dir=='desc' else 'desc') }}">
+              Heur de prod
+            </a>
+          </th>
+          <th class="px-4 py-3 text-right">
+            <a href="{{ url_for('dashboard_huma_agents', debut=debut, fin=fin, sort='Cu', dir='asc' if sort!='Cu' or dir=='desc' else 'desc') }}">
+              Cu
+            </a>
+          </th>
+          <th class="px-4 py-3 text-right">
+            <a href="{{ url_for('dashboard_huma_agents', debut=debut, fin=fin, sort='Don', dir='asc' if sort!='Don' or dir=='desc' else 'desc') }}">
+              Don
+            </a>
+          </th>
+          <th class="px-4 py-3 text-right">
+            <a href="{{ url_for('dashboard_huma_agents', debut=debut, fin=fin, sort='Indecis', dir='asc' if sort!='Indecis' or dir=='desc' else 'desc') }}">
+              Indécis
+            </a>
+          </th>
+          <th class="px-4 py-3 text-right">
+            <a href="{{ url_for('dashboard_huma_agents', debut=debut, fin=fin, sort='Don_par_mail', dir='asc' if sort!='Don_par_mail' or dir=='desc' else 'desc') }}">
+              Don par mail
+            </a>
+          </th>
+          <th class="px-4 py-3 text-right">
+            <a href="{{ url_for('dashboard_huma_agents', debut=debut, fin=fin, sort='Montant', dir='asc' if sort!='Montant' or dir=='desc' else 'desc') }}">
+              Montant (€)
+            </a>
+          </th>
+          <th class="px-4 py-3 text-right">
+            <a href="{{ url_for('dashboard_huma_agents', debut=debut, fin=fin, sort='Tx_daccord', dir='asc' if sort!='Tx_daccord' or dir=='desc' else 'desc') }}">
+              Tx d'accord
+            </a>
+          </th>
+          <th class="px-4 py-3 text-right">
+            <a href="{{ url_for('dashboard_huma_agents', debut=debut, fin=fin, sort='Don_moyen', dir='asc' if sort!='Don_moyen' or dir=='desc' else 'desc') }}">
+              Don moyen
+            </a>
+          </th>
+          <th class="px-4 py-3 text-right">
+            <a href="{{ url_for('dashboard_huma_agents', debut=debut, fin=fin, sort='Cu_h', dir='asc' if sort!='Cu_h' or dir=='desc' else 'desc') }}">
+              Cu/h
+            </a>
+          </th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-100 dark:divide-dark-700">
+        {% for r in rows_agents %}
+        <tr class="hover:bg-gray-50 dark:hover:bg-dark-700">
+          <td class="px-4 py-2 font-semibold">{{ r.agent }}</td>
+          <td class="px-4 py-2 text-right">{{ "%.2f"|format(r.Heur_de_prod) }}</td>
+          <td class="px-4 py-2 text-right">{{ r.Cu }}</td>
+          <td class="px-4 py-2 text-right text-green-600 dark:text-green-400">{{ r.Don }}</td>
+          <td class="px-4 py-2 text-right text-yellow-600">{{ r.Indecis }}</td>
+          <td class="px-4 py-2 text-right text-blue-600">{{ r.Don_par_mail }}</td>
+          <td class="px-4 py-2 text-right">{{ "%.2f"|format(r.Montant) }}</td>
+          <td class="px-4 py-2 text-right">{{ "%.2f"|format(r.Tx_daccord * 100) }}%</td>
+          <td class="px-4 py-2 text-right">{{ "%.2f"|format(r.Don_moyen) }}</td>
+          <td class="px-4 py-2 text-right">{{ "%.2f"|format(r.Cu_h) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="text-center text-gray-500 dark:text-gray-300 mt-10">
+    Aucune donnée trouvée pour cette période.
+  </p>
+  {% endif %}
+</div>
+{% endblock %}

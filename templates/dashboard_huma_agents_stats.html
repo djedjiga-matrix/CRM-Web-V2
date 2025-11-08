@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% block title %}Analyse agents humanitaire{% endblock %}
+{% block header_title %}Analyse statistique agent{% endblock %}
+
+{% block content %}
+<div class="flex justify-between items-center mb-4">
+  <h2 class="text-xl font-bold">Analyse par jour</h2>
+  <form method="get" class="flex gap-2 items-center">
+    <input type="date" name="debut" value="{{ debut }}" class="border rounded px-2 py-1">
+    <input type="date" name="fin" value="{{ fin }}" class="border rounded px-2 py-1">
+    <select name="agent" class="border rounded px-2 py-1">
+      <option value="">Tous les agents</option>
+      {% for a in agents %}
+        <option value="{{ a }}" {% if agent_selected == a %}selected{% endif %}>{{ a }}</option>
+      {% endfor %}
+    </select>
+    <button class="bg-blue-600 text-white px-3 py-1 rounded">Filtrer</button>
+  </form>
+</div>
+
+{% if not request.args.get('debut') and not request.args.get('fin') %}
+  <p class="text-sm text-gray-500 italic mb-2">
+    📅 Affichage automatique : statistiques du mois en cours ({{ debut }} → {{ fin }})
+  </p>
+{% endif %}
+
+<div class="bg-white dark:bg-dark-800 rounded-xl shadow overflow-x-auto mb-8">
+  <table class="min-w-full text-sm">
+    <thead class="bg-gray-50 dark:bg-dark-700">
+      <tr>
+        <th class="px-4 py-2 text-left">Date</th>
+        <th class="px-4 py-2 text-left">Agent</th>
+        <th class="px-4 py-2 text-right">Heur prod</th>
+        <th class="px-4 py-2 text-right">CU</th>
+        <th class="px-4 py-2 text-right">Don</th>
+        <th class="px-4 py-2 text-right">Don mail</th>
+        <th class="px-4 py-2 text-right">Montant</th>
+        <th class="px-4 py-2 text-right">Don moyen</th>
+        <th class="px-4 py-2 text-right">Tx d'accord</th>
+        <th class="px-4 py-2 text-right">CA</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-gray-100 dark:divide-dark-700">
+      {% for r in daily_rows %}
+      <tr>
+        <td class="px-4 py-2">{{ r.date }}</td>
+        <td class="px-4 py-2">{{ r.agent }}</td>
+        <td class="px-4 py-2 text-right">{{ "%.2f"|format(r.heures) }}</td>
+        <td class="px-4 py-2 text-right">{{ r.Cu }}</td>
+        <td class="px-4 py-2 text-right">{{ r.Don }}</td>
+        <td class="px-4 py-2 text-right">{{ r.DonMail }}</td>
+        <td class="px-4 py-2 text-right">{{ "%.2f"|format(r.Montant_Don) }}</td>
+        <td class="px-4 py-2 text-right">{{ "%.2f"|format(r.don_moyen) }}</td>
+        <td class="px-4 py-2 text-right">{{ "%.2f"|format(r.tx_daccord * 100) }}%</td>
+        <td class="px-4 py-2 text-right text-green-600 font-semibold">{{ "%.2f"|format(r.ca) }} €</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<h2 class="text-xl font-bold mb-4">Cumul mensuel</h2>
+<div class="bg-white dark:bg-dark-800 rounded-xl shadow overflow-x-auto">
+  <table class="min-w-full text-sm">
+    <thead class="bg-gray-50 dark:bg-dark-700">
+      <tr>
+        <th class="px-4 py-2 text-left">Mois</th>
+        <th class="px-4 py-2 text-left">Agent</th>
+        <th class="px-4 py-2 text-right">CU</th>
+        <th class="px-4 py-2 text-right">Don</th>
+        <th class="px-4 py-2 text-right">Don mail</th>
+        <th class="px-4 py-2 text-right">Montant</th>
+        <th class="px-4 py-2 text-right">Don moyen</th>
+        <th class="px-4 py-2 text-right">Tx d'accord</th>
+        <th class="px-4 py-2 text-right">CA</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-gray-100 dark:divide-dark-700">
+      {% for r in monthly_rows %}
+      <tr>
+        <td class="px-4 py-2">{{ r.month }}</td>
+        <td class="px-4 py-2">{{ r.agent }}</td>
+        <td class="px-4 py-2 text-right">{{ r.Cu }}</td>
+        <td class="px-4 py-2 text-right">{{ r.Don }}</td>
+        <td class="px-4 py-2 text-right">{{ r.DonMail }}</td>
+        <td class="px-4 py-2 text-right">{{ "%.2f"|format(r.Montant_Don) }}</td>
+        <td class="px-4 py-2 text-right">{{ "%.2f"|format(r.don_moyen) }}</td>
+        <td class="px-4 py-2 text-right">{{ "%.2f"|format(r.tx_daccord * 100) }}%</td>
+        <td class="px-4 py-2 text-right text-green-600 font-semibold">{{ "%.2f"|format(r.ca) }} €</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

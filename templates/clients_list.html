@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% block title %}{{ title or "Clients" }}{% endblock %}
+
+{% block content %}
+<div class="max-w-full mx-auto px-4 sm:px-6 py-6">
+
+  <!-- En-tête -->
+  <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-6">
+    <div>
+      <h1 class="text-2xl font-bold text-gray-800 dark:text-white">
+        {{ title or "Clients" }}
+      </h1>
+      <p class="text-gray-600 dark:text-gray-300">
+        Résultats : {{ rows|length }} / {{ total }}
+      </p>
+    </div>
+
+    <!-- Barre de recherche -->
+    <form method="get" action="{{ base_path }}" class="flex items-center gap-2">
+      <input
+        type="text" name="q" value="{{ q or '' }}"
+        placeholder="Rechercher (nom, prénom, téléphone)"
+        class="px-3 py-2 rounded-lg border dark:bg-dark-800 dark:text-white"
+      />
+      <select name="per_page" class="px-3 py-2 rounded-lg border dark:bg-dark-800 dark:text-white">
+        <option value="25"  {% if per_page == 25 %}selected{% endif %}>25</option>
+        <option value="50"  {% if per_page == 50 %}selected{% endif %}>50</option>
+        <option value="100" {% if per_page == 100 %}selected{% endif %}>100</option>
+      </select>
+      <button class="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700">
+        Rechercher
+      </button>
+    </form>
+  </div>
+
+  {% set keys = rows[0].keys() if rows else [] %}
+
+  <!-- Tableau -->
+  <div class="overflow-x-auto bg-white dark:bg-dark-800 rounded-xl shadow">
+    <table class="min-w-full text-sm">
+      <thead class="bg-gray-50 dark:bg-dark-700 text-gray-700 dark:text-gray-200">
+        <tr>
+          <th class="px-4 py-3 text-left">ID</th>
+          <th class="px-4 py-3 text-left">Date</th>
+          <th class="px-4 py-3 text-left">Nom</th>
+          <th class="px-4 py-3 text-left">Prénom</th>
+          <th class="px-4 py-3 text-left">Téléphone</th>
+          <th class="px-4 py-3 text-left">Statut</th>
+          <th class="px-4 py-3 text-left">Agent</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y dark:divide-dark-700">
+        {% for r in rows %}
+        <tr class="hover:bg-gray-50 dark:hover:bg-dark-700">
+          <td class="px-4 py-3">{{ r['id'] }}</td>
+          <td class="px-4 py-3">
+            {% if 'DATE_SIGNATURE' in keys %}{{ r['DATE_SIGNATURE'] }}
+            {% elif 'DATE_MODIF' in keys %}{{ r['DATE_MODIF'] }}
+            {% else %}-{% endif %}
+          </td>
+          <td class="px-4 py-3">{% if 'NOM_CLIENT' in keys %}{{ r['NOM_CLIENT'] }}{% else %}-{% endif %}</td>
+          <td class="px-4 py-3">{% if 'PRENOM_CLIENT' in keys %}{{ r['PRENOM_CLIENT'] }}{% else %}-{% endif %}</td>
+          <td class="px-4 py-3">{% if 'TELEPHONE' in keys %}{{ r['TELEPHONE'] }}{% else %}-{% endif %}</td>
+          <td class="px-4 py-3">{% if 'STATUT' in keys %}{{ r['STATUT'] }}{% else %}-{% endif %}</td>
+          <td class="px-4 py-3">{% if 'AGENT' in keys %}{{ r['AGENT'] }}{% else %}-{% endif %}</td>
+        </tr>
+        {% else %}
+        <tr>
+          <td class="px-4 py-6 text-center text-gray-500 dark:text-gray-300" colspan="7">
+            Aucun résultat.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Pagination -->
+  {% set pages = (total // per_page) + (1 if (total % per_page) else 0) %}
+  <div class="flex items-center justify-between mt-4">
+    <div class="text-sm text-gray-600 dark:text-gray-300">
+      Page {{ page }} / {{ pages if pages>0 else 1 }}
+    </div>
+    <div class="flex items-center gap-2">
+      {% if page > 1 %}
+        <a class="px-3 py-2 rounded-lg border dark:text-white" href="{{ base_path }}?page={{ page - 1 }}&per_page={{ per_page }}&q={{ q }}">Précédent</a>
+      {% endif %}
+      {% if page < pages %}
+        <a class="px-3 py-2 rounded-lg border dark:text-white" href="{{ base_path }}?page={{ page + 1 }}&per_page={{ per_page }}&q={{ q }}">Suivant</a>
+      {% endif %}
+    </div>
+  </div>
+
+</div>
+{% endblock %}

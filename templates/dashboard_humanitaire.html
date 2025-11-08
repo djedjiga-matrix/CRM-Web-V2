@@ -1,187 +1,184 @@
 {% extends "base.html" %}
-
 {% block title %}Dashboard Humanitaire{% endblock %}
-
 {% block header_title %}Dashboard Humanitaire{% endblock %}
 
-
-
 {% block content %}
+<form id="etlForm" onsubmit="runEtl(); return false;" class="mb-4">
+  <button type="submit" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded">
+    🔄 Rafraîchir les données
+  </button>
+</form>
+{% macro fmtnum(x, digits=2) -%}
+  {%- if x is number -%}
+    {{ ("{:0." ~ digits ~ "f}").format(x) }}
+  {%- else -%}
+    {{ x or "0" }}
+  {%- endif -%}
+{%- endmacro %}
 
 <div class="max-w-full mx-auto px-4 sm:px-6 py-6">
-
-  <!-- En-tête + filtres -->
-
+  <!-- En-tête -->
   <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
-
-    <div>
-
-      <h1 class="text-2xl font-bold">Dashboard Humanitaire</h1>
-
-      <p class="text-gray-600">Dernière connexion : {{ auj }}</p>
-
+    <div class="flex items-center gap-4">
+      <div class="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
+        <i class="fas fa-hands-helping text-primary text-2xl"></i>
+      </div>
+      <div>
+        <h1 class="text-2xl font-bold text-gray-800 dark:text-white">Dashboard Humanitaire</h1>
+        <p class="text-gray-600 dark:text-gray-300">Dernière connexion : {{ auj or "" }}</p>
+      </div>
     </div>
 
-    <form method="get" action="{{ url_for('dashboard_humanitaire') }}" class="flex gap-2">
-
+    <!-- Filtres -->
+    <form method="get" action="{{ url_for('dashboard_humanitaire') }}" class="flex flex-wrap items-center gap-2">
       <input type="date" name="debut" value="{{ debut }}" class="border rounded px-3 py-2">
-
       <input type="date" name="fin"   value="{{ fin }}"   class="border rounded px-3 py-2">
 
-      <button class="bg-blue-600 text-white rounded px-4 py-2">Filtrer</button>
-
-    </form>
-
-  </div>
-
-
-
-  <!-- KPIs -->
-
-  <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-
-    <div class="p-4 rounded border">
-
-      <div class="text-sm text-gray-600">Dons (nb)</div>
-
-      <div class="text-2xl font-semibold">{{ kpis.dons_total }}</div>
-
-    </div>
-
-    <div class="p-4 rounded border">
-
-      <div class="text-sm text-gray-600">Montant total</div>
-
-      <div class="text-2xl font-semibold">{{ kpis.montant_total }}</div>
-
-    </div>
-
-    <div class="p-4 rounded border">
-
-      <div class="text-sm text-gray-600">Don moyen</div>
-
-      <div class="text-2xl font-semibold">{{ kpis.don_moyen }}</div>
-
-    </div>
-
-    <div class="p-4 rounded border">
-
-      <div class="text-sm text-gray-600">Tx d'accord</div>
-
-      <div class="text-2xl font-semibold">{{ kpis.tx_accord }}</div>
-
-    </div>
-
-  </div>
-
-
-
-  <!-- Tableau -->
-
-  <div class="overflow-auto">
-
-    <table class="min-w-full border rounded">
-
-      <thead class="bg-gray-100">
-
-        <tr>
-
-          <th class="px-3 py-2 text-left">TV</th>
-
-          <th class="px-3 py-2 text-right">Heur Prod</th>
-
-          <th class="px-3 py-2 text-right">Cu</th>
-
-          <th class="px-3 py-2 text-right">Don</th>
-
-          <th class="px-3 py-2 text-right">Don en ligne</th>
-
-          <th class="px-3 py-2 text-right">Indécis</th>
-
-          <th class="px-3 py-2 text-right">Montant</th>
-
-          <th class="px-3 py-2 text-right">Don Moyen</th>
-
-          <th class="px-3 py-2 text-right">Tx d'accord</th>
-
-          <th class="px-3 py-2 text-right">Cu/H</th>
-
-          <th class="px-3 py-2 text-right">Tx Argu</th>
-
-        </tr>
-
-      </thead>
-
-      <tbody>
-
-        {% for r in rows %}
-
-        <tr class="border-t">
-
-          <td class="px-3 py-2">{{ r["TV"] }}</td>
-
-          <!-- Ces colonnes sont déjà des strings formatées côté Python -->
-
-          <td class="px-3 py-2 text-right">{{ r["Heur Prod"] }}</td>
-
-          <td class="px-3 py-2 text-right">{{ r["Cu"] }}</td>
-
-          <td class="px-3 py-2 text-right">{{ r["Don"] }}</td>
-
-          <td class="px-3 py-2 text-right">{{ r["Don en ligne"] }}</td>
-
-          <td class="px-3 py-2 text-right">{{ r["Indecis"] }}</td>
-
-          <td class="px-3 py-2 text-right">{{ r["Montant_Don"] }}</td>
-
-          <td class="px-3 py-2 text-right">{{ r["Don Moyen"] }}</td>
-
-          <td class="px-3 py-2 text-right">{{ r["Tx_d'accord"] }}</td>
-
-          <td class="px-3 py-2 text-right">{{ r["Cu/H"] }}</td>
-
-          <td class="px-3 py-2 text-right">{{ r["Tx_Argu"] }}</td>
-
-        </tr>
-
+      <select name="asso" class="border rounded px-3 py-2">
+        <option value="">Toutes les associations</option>
+        {% for a in associations %}
+          <option value="{{ a }}" {% if asso_selected == a %}selected{% endif %}>{{ a }}</option>
         {% endfor %}
+      </select>
 
-      </tbody>
+      <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded">
+        Filtrer
+      </button>
 
-
-
-      <!-- Totaux -->
-
-      <tfoot class="bg-gray-50 border-t">
-
-        <tr>
-
-          <td class="px-3 py-2 font-semibold">Totaux</td>
-
-          <td class="px-3 py-2 text-right font-semibold">{{ totaux["Heur_Prod"] }}</td>
-
-          <td class="px-3 py-2 text-right font-semibold">{{ totaux["Cu"] }}</td>
-
-          <td class="px-3 py-2 text-right font-semibold">{{ totaux["Don"] }}</td>
-
-          <td class="px-3 py-2 text-right font-semibold">{{ totaux["Don en ligne"] }}</td>
-
-          <td class="px-3 py-2 text-right font-semibold">{{ totaux["Indecis"] }}</td>
-
-          <td class="px-3 py-2 text-right font-semibold">{{ totaux["Montant_Don"] }}</td>
-
-          <td class="px-3 py-2 text-right font-semibold">{{ totaux["Don_Moyen"] }}</td>
-
-          <td colspan="3"></td>
-
-        </tr>
-
-      </tfoot>
-
-    </table>
-
+      <!-- ton bouton de refresh si tu l'as ajouté -->
+      <a href="{{ url_for('admin_refresh_import') }}"
+         class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded">
+        Rafraîchir données
+      </a>
+    </form>
   </div>
 
-</div>
+  {% if stats_globales %}
+  <div class="grid grid-cols-1 md:grid-cols-6 gap-4 mb-6">
+    <div class="bg-white dark:bg-dark-800 rounded-xl shadow p-4">
+      <p class="text-sm text-gray-500 dark:text-gray-300">Heur de prod</p>
+      <p class="text-2xl font-bold">
+        {{ "%.2f"|format(stats_globales.total_heures_prod) }}
+      </p>
+    </div>
+    <div class="bg-white dark:bg-dark-800 rounded-xl shadow p-4">
+      <p class="text-sm text-gray-500 dark:text-gray-300">CU total</p>
+      <p class="text-2xl font-bold">
+        {{ stats_globales.total_cu }}
+      </p>
+    </div>
+    <div class="bg-white dark:bg-dark-800 rounded-xl shadow p-4">
+      <p class="text-sm text-gray-500 dark:text-gray-300">Dons</p>
+      <p class="text-2xl font-bold">
+        {{ stats_globales.total_don }}
+      </p>
+    </div>
+    <div class="bg-white dark:bg-dark-800 rounded-xl shadow p-4">
+      <p class="text-sm text-gray-500 dark:text-gray-300">Don par mail</p>
+      <p class="text-2xl font-bold">
+        {{ stats_globales.total_don_mail }}
+      </p>
+    </div>
+    <div class="bg-white dark:bg-dark-800 rounded-xl shadow p-4">
+      <p class="text-sm text-gray-500 dark:text-gray-300">Tx d'accord</p>
+      <p class="text-2xl font-bold">
+        {{ "%.2f"|format(stats_globales.tx_daccord * 100) }}%
+      </p>
+    </div>
+    <div class="bg-white dark:bg-dark-800 rounded-xl shadow p-4">
+      <p class="text-sm text-gray-500 dark:text-gray-300">Don moyen</p>
+      <p class="text-2xl font-bold">
+        {{ "%.2f"|format(stats_globales.don_moyen) }}
+      </p>
+    </div>
+  </div>
+  {% endif %}
 
+  {% if stats_globales %}
+<div class="grid grid-cols-1 md:grid-cols-7 gap-4 mb-6">
+  <!-- ... tes autres cartes ... -->
+
+  <!-- Chiffre d’affaires -->
+  <div class="bg-white dark:bg-dark-800 rounded-xl shadow p-4 relative group">
+    <p class="text-sm text-gray-500 dark:text-gray-300 flex items-center gap-2">
+      Chiffre d’affaires
+      <span class="w-5 h-5 rounded-full bg-gray-200 dark:bg-gray-700 text-xs flex items-center justify-center cursor-pointer"
+            title="CA estimé = valeur de la grille Qualicontact × nombre de dons">
+        i
+      </span>
+    </p>
+    <p class="text-2xl font-bold text-green-600 mt-1">
+      {{ "%.2f"|format(stats_globales.chiffre_affaire) }} €
+    </p>
+    <!-- petite bulle au survol -->
+    <div class="hidden group-hover:block absolute top-2 right-2 bg-gray-900 text-white text-xs rounded px-3 py-2 max-w-xs z-10">
+      CA estimé à partir du fichier “BDD QUALICONTACT.xlsx” selon le don moyen et le taux d’accord.
+    </div>
+  </div>
+</div>
+{% endif %}
+
+
+  <!-- Cartes KPI (optionnelles) -->
+  
+
+  <!-- Tableau unique : Résumé par base -->
+  <h2 class="text-xl font-bold text-gray-800 dark:text-white mb-3">Résumé par base</h2>
+
+  <div class="bg-white dark:bg-dark-800 rounded-xl shadow overflow-x-auto">
+    <table class="min-w-full text-sm">
+      <thead class="bg-gray-50 dark:bg-dark-700 text-gray-700 dark:text-gray-200">
+        <tr>
+          <th class="px-4 py-3 text-left">Base</th>
+          <th class="px-4 py-3 text-right">Cu</th>
+          <th class="px-4 py-3 text-right">Don</th>
+          <th class="px-4 py-3 text-right">Montant</th>
+          <th class="px-4 py-3 text-right">Don Moyen</th>
+          <th class="px-4 py-3 text-right">Tx d'accord</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-100 dark:divide-dark-700">
+        {% for r in rows_bases %}
+        <tr>
+          <td class="px-4 py-2">{{ r.base }}</td>
+          <td class="px-4 py-2 text-right">{{ "%.0f"|format(r.Cu) }}</td>
+          <td class="px-4 py-2 text-right">{{ "%.0f"|format(r.Don) }}</td>
+          <td class="px-4 py-2 text-right">{{ "%.2f"|format(r.Montant_Don) }}</td>
+          <td class="px-4 py-2 text-right">{{ "%.2f"|format(r["Don Moyen"]) }}</td>
+          <td class="px-4 py-2 text-right">{{ "%.2f"|format(r["Tx_d'accord"] * 100 if r["Tx_d'accord"] else 0) }}%</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot class="bg-gray-50 dark:bg-dark-700 font-semibold">
+        <tr>
+          <td class="px-4 py-3">Totaux</td>
+          <td class="px-4 py-3 text-right">{{ totaux_bases["Cu"] }}</td>
+          <td class="px-4 py-3 text-right">{{ totaux_bases["Don"] }}</td>
+          <td class="px-4 py-3 text-right">{{ "%.2f"|format(totaux_bases["Montant_Don"]) }}</td>
+          <td class="px-4 py-3 text-right">{{ "%.2f"|format(totaux_bases["Don_Moyen"]) }}</td>
+          <td class="px-4 py-3 text-right">—</td>
+        </tr>
+      </tfoot>
+    </table>
+    
+  </div>
+</div>
+<script>
+async function runEtl() {
+  const btn = document.querySelector("#etlForm button");
+  btn.disabled = true;
+  btn.innerText = "⏳ Import en cours...";
+  try {
+    const resp = await fetch("/run_etl", { method: "POST" });
+    const data = await resp.json();
+    alert(data.message);
+    if (data.status === "success") location.reload();
+  } catch (err) {
+    alert("Erreur lors du lancement de l’import.");
+  } finally {
+    btn.disabled = false;
+    btn.innerText = "🔄 Rafraîchir les données";
+  }
+}
+</script>
 {% endblock %}

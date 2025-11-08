@@ -738,10 +738,10 @@ def run_etl():
         if result.returncode == 0:
             return jsonify({"status": "success", "message": "Import terminé avec succès.", "log": result.stdout}), 200
         else:
-            return jsonify({"status": "error", "message": "Erreur lors de l'import.", "log": result.stderr}), 500
+            return jsonify({"status": "error", "message": "Erreur lors de l’import.", "log": result.stderr}), 500
 
     except subprocess.TimeoutExpired:
-        return jsonify({"status": "error", "message": "L'import a dépassé le délai autorisé."}), 500
+        return jsonify({"status": "error", "message": "L’import a dépassé le délai autorisé."}), 500
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
@@ -1246,7 +1246,7 @@ def nan_to_empty(v):
 @app.template_filter("monnaie")
 def monnaie_filter(montant_eur, pays="France", taux=1.0):
     """
-    Exemple d'usage : {{ 150 | monnaie('Tunisie', 3.35) }}
+    Exemple d’usage : {{ 150 | monnaie('Tunisie', 3.35) }}
     """
     try:
         return format_local_amount(pays, float(montant_eur or 0), float(taux))
@@ -1600,7 +1600,7 @@ def nan_to_empty(v):
 @app.template_filter("monnaie")
 def monnaie_filter(montant_eur, pays="France", taux=1.0):
     """
-    Exemple d'usage : {{ 150 | monnaie('Tunisie', 3.35) }}
+    Exemple d’usage : {{ 150 | monnaie('Tunisie', 3.35) }}
     """
     try:
         return format_local_amount(pays, float(montant_eur or 0), float(taux))
@@ -3122,7 +3122,7 @@ def export_excel_valandre():
 
     produits = ["STRATO", "LSR", "PRESSE", "ENI", "SERENITY", "PROTEC_ALLIANCE", "WEKIWI"]
 
-    # Colonnes exportées (même ordre que ton fichier d'origine)
+    # Colonnes exportées (même ordre que ton fichier d’origine)
     select_cols = ["DATE_SIGNATURE", "NOM_VENDEUR", "PRENOM_VENDEUR", "TITRE", "NOM_CLIENT", "PRENOM_CLIENT", "TELEPHONE"]
     for prod in produits:
         select_cols += [f"{prod}_NUM", f"{prod}_STATUT", f"{prod}_REMARQUE"]
@@ -3308,8 +3308,8 @@ def export_excel_valandre():
     ws.merge_cells(start_row=1, start_column=col, end_row=2, end_column=col); col += 1
     ws.merge_cells(start_row=1, start_column=col, end_row=2, end_column=col)
 
-    # Lignes de données (respecter l'ordre select_cols)
-    # S'assurer que toutes les colonnes existent
+    # Lignes de données (respecter l’ordre select_cols)
+    # S’assurer que toutes les colonnes existent
     for colname in select_cols:
         if colname not in df.columns:
             df[colname] = ""
@@ -4459,115 +4459,29 @@ def dashboard_ca_projets():
     import sqlite3, os
     import pandas as pd
     from datetime import date
-    from flask import request
-
+    # si tu as un login
     if "agent_nom" not in session:
         return redirect(url_for("login"))
 
-    period = request.args.get("period", "day")  # "day" ou "month"
-    # on affiche le mois courant par défaut
-    today = date.today()
-    mois_courant = today.strftime("%Y-%m")
+    # 1) CA VALANDRE = 4€ * nb lignes valandre
+    # adapte le nom de ta table/colonne
+    with sqlite3.connect("clients.db") as con:  # <-- mets ta base principale
+        cur = con.cursor()
+        # exemple si tu as une table clients_valandre
+        nb_valandre = cur.execute("SELECT COUNT(*) FROM clients_valandre").fetchone()[0]
+        ca_valandre = nb_valandre * 4.0
 
-    crm_db = "crm_clients.db"
+        # exemple si tu as une table clients (SFR)
+        nb_sfr = cur.execute("SELECT COUNT(*) FROM clients_sfr").fetchone()[0]
+        ca_sfr = nb_sfr * 3.0
 
-    # -----------------------------
-    # 1) SFR & VALANDRE (données brutes)
-    # -----------------------------
-    # on va récupérer les lignes avec leur date
-    df_projets = pd.DataFrame()
-    if os.path.exists(crm_db):
-        with sqlite3.connect(crm_db) as con:
-            # SFR
-            try:
-                df_sfr = pd.read_sql("""
-                    SELECT 
-                        c.id,
-                        'SFR' AS projet,
-                        COALESCE(c.date_saisie, c.created_at, c.date_creation) AS dt
-                    FROM clients c
-                    JOIN campagnes cp ON cp.id = c.campagne_id
-                    WHERE cp.nom = 'EXOSPHERE_SFR'
-                """, con)
-            except Exception:
-                df_sfr = pd.DataFrame(columns=["id", "projet", "dt"])
-
-            # VALANDRE dans clients
-            try:
-                df_val = pd.read_sql("""
-                    SELECT 
-                        c.id,
-                        'VALANDRE' AS projet,
-                        COALESCE(c.date_saisie, c.created_at, c.date_creation) AS dt
-                    FROM clients c
-                    JOIN campagnes cp ON cp.id = c.campagne_id
-                    WHERE cp.nom = 'VALANDRE'
-                """, con)
-            except Exception:
-                df_val = pd.DataFrame(columns=["id", "projet", "dt"])
-
-            # VALANDRE historique
-            # (on lui met une date vide si pas de colonne, tu pourras l'ajouter après)
-            try:
-                tables = [r[0] for r in con.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()]
-                if "clients_valandre" in tables:
-                    df_val_hist = pd.read_sql("""
-                        SELECT 
-                            id,
-                            'VALANDRE' AS projet,
-                            COALESCE(date_saisie, created_at, date('now')) AS dt
-                        FROM clients_valandre
-                    """, con)
-                else:
-                    df_val_hist = pd.DataFrame(columns=["id", "projet", "dt"])
-            except Exception:
-                df_val_hist = pd.DataFrame(columns=["id", "projet", "dt"])
-
-        df_projets = pd.concat([df_sfr, df_val, df_val_hist], ignore_index=True)
-
-    # normaliser la date
-    if not df_projets.empty:
-        df_projets["dt"] = pd.to_datetime(df_projets["dt"], errors="coerce")
-        df_projets = df_projets.dropna(subset=["dt"])
-        df_projets["day"] = df_projets["dt"].dt.date.astype(str)
-        df_projets["month"] = df_projets["dt"].dt.to_period("M").astype(str)
-    else:
-        df_projets["projet"] = []
-        df_projets["day"] = []
-        df_projets["month"] = []
-
-    # tarifs
-    TARIFS = {
-        "SFR": 3.0,
-        "VALANDRE": 4.0,
-    }
-
-    # agrégat par période
-    if period == "month":
-        grp = df_projets.groupby(["month", "projet"]).size().reset_index(name="nb")
-        # on garde que le mois courant si tu veux
-        # grp = grp[grp["month"] == mois_courant]
-        grp["ca"] = grp.apply(lambda r: r["nb"] * TARIFS.get(r["projet"], 0), axis=1)
-        rows_projets = grp.sort_values(["month", "projet"]).to_dict(orient="records")
-    else:  # day
-        grp = df_projets.groupby(["day", "projet"]).size().reset_index(name="nb")
-        grp["ca"] = grp.apply(lambda r: r["nb"] * TARIFS.get(r["projet"], 0), axis=1)
-        rows_projets = grp.sort_values(["day", "projet"]).to_dict(orient="records")
-
-    # CA global "instantané" (toutes lignes)
-    nb_sfr = int((df_projets["projet"] == "SFR").sum())
-    nb_valandre = int((df_projets["projet"] == "VALANDRE").sum())
-    ca_sfr = nb_sfr * TARIFS["SFR"]
-    ca_valandre = nb_valandre * TARIFS["VALANDRE"]
-
-    # -----------------------------
-    # 2) HUMANITAIRE par association (comme avant)
-    # -----------------------------
+    # 2) Humanitaire → CA par association (3 premières lettres de base)
     huma_db = "humanitaire.db"
     asso_rows = []
     if os.path.exists(huma_db):
         with sqlite3.connect(huma_db) as con:
-            df_h = pd.read_sql("""
+            # on lit tous les calls
+            df = pd.read_sql("""
                 SELECT
                     COALESCE(base,'') AS base,
                     COALESCE(lib_status,'') AS lib_status,
@@ -4576,7 +4490,8 @@ def dashboard_ca_projets():
                 WHERE base IS NOT NULL AND base <> ''
             """, con)
 
-        if not df_h.empty:
+        if not df.empty:
+            # on normalise
             CU_STATUTS = (
                 "REF refus",
                 "DAM don avec montant",
@@ -4591,152 +4506,67 @@ def dashboard_ca_projets():
                 "PAM Pa mensuel",
                 "PAT Pa Trimestriel",
             )
+            df["asso"] = df["base"].str.slice(0, 3).str.upper()
+            df["is_cu"] = df["lib_status"].isin(CU_STATUTS).astype(int)
+            df["is_don"] = df["lib_status"].isin(DON_STATUTS).astype(int)
 
-            df_h["asso"] = df_h["base"].str.slice(0, 3).str.upper()
-            df_h["is_cu"] = df_h["lib_status"].isin(CU_STATUTS).astype(int)
-            df_h["is_don"] = df_h["lib_status"].isin(DON_STATUTS).astype(int)
-
-            tmp = []
-            for asso, g in df_h.groupby("asso"):
-                total_cu = int(g["is_cu"].sum())
+            # on va calculer le CA association par association avec notre fonction
+            asso_list = []
+            for asso, g in df.groupby("asso"):
                 total_don = int(g["is_don"].sum())
-                montant_don = 0.0
-                if total_don > 0:
-                    for v in g.loc[g["is_don"] == 1, "don_val"]:
+                if total_don == 0:
+                    ca_asso = 0.0
+                    don_moyen = 0.0
+                    tx_daccord = 0.0
+                else:
+                    montant_don = 0.0
+                    # montant seulement pour les dons
+                    mask_don = g["is_don"] == 1
+                    for v, st in zip(g.loc[mask_don, "don_val"], g.loc[mask_don, "lib_status"]):
                         try:
                             montant_don += float(v)
                         except Exception:
                             pass
-                    don_moyen = montant_don / total_don
-                else:
-                    don_moyen = 0.0
-                tx_daccord = (total_don / total_cu) if total_cu > 0 else 0.0
-                try:
+                    don_moyen = montant_don / total_don if total_don > 0 else 0.0
+                    cu_asso = int(g["is_cu"].sum())
+                    tx_daccord = (total_don / cu_asso) if cu_asso > 0 else 0.0
+
                     ca_asso = calculer_chiffre_affaire_dyn(
                         don_moyen=don_moyen,
                         tx_daccord=tx_daccord,
                         total_don=total_don,
                         path_excel=os.path.join("Data", "inbox", "BDD QUALICONTACT.xlsx")
                     )
-                except Exception:
-                    ca_asso = 0.0
 
-                tmp.append({
+                asso_list.append({
                     "asso": asso,
-                    "total_cu": total_cu,
+                    "total_cu": int(g["is_cu"].sum()),
                     "total_don": total_don,
                     "don_moyen": don_moyen,
                     "tx_daccord": tx_daccord,
                     "ca": ca_asso,
                 })
-            asso_rows = sorted(tmp, key=lambda x: x["ca"], reverse=True)
 
-    ca_total = ca_sfr + ca_valandre + sum(a["ca"] for a in asso_rows)
+            # trier par CA desc
+            asso_rows = sorted(asso_list, key=lambda x: x["ca"], reverse=True)
+
+    # CA global
+    ca_total = ca_valandre + ca_sfr + sum(a["ca"] for a in asso_rows)
 
     return render_template(
         "dashboard_ca_projets.html",
-        auj=today.isoformat(),
-        period=period,
-        rows_projets=rows_projets,
-        ca_sfr=ca_sfr,
+        auj=date.today().isoformat(),
         ca_valandre=ca_valandre,
-        nb_sfr=nb_sfr,
         nb_valandre=nb_valandre,
+        ca_sfr=ca_sfr,
+        nb_sfr=nb_sfr,
         asso_rows=asso_rows,
         ca_total=ca_total,
     )
 
 
-
-# ------------------------------------------------------------
-# Routes: listes des clients par campagne (SFR / Valandre)
-# Vue SQLite requise: clients_sfr, clients_valandre_view
-# ------------------------------------------------------------
-import os, sqlite3
-
-from flask import request, render_template
-
-
-# Récupération du nom de la base depuis .env (sinon fallback)
-DB_NAME = os.getenv("DB_NAME", "crm_clients.db")
-
-
-def _query_rows(view_name: str, page: int = 1, per_page: int = 50, q: str = ""):
-    """Lit une vue SQLite (clients_sfr ou clients_valandre_view) avec pagination et recherche simple."""
-    offset = max(0, (page - 1) * per_page)
-    con = sqlite3.connect(DB_NAME)
-    con.row_factory = sqlite3.Row
-    cur = con.cursor()
-
-    # total
-    total = cur.execute(f"SELECT COUNT(*) FROM {view_name}").fetchone()[0]
-
-    # filtre recherche (nom/prenom/tel si 'q' fourni)
-    where = ""
-    params = []
-    if q:
-        where = "WHERE (COALESCE(NOM_CLIENT,'') LIKE ? OR COALESCE(PRENOM_CLIENT,'') LIKE ? OR COALESCE(TELEPHONE,'') LIKE ?)"
-        like = f"%{q}%"
-        params.extend([like, like, like])
-
-    # Ordre: on essaie DATE_SIGNATURE puis id, selon dispo
-    # NB: SQLite ignore les colonnes inconnues si on les traite via CASE dans ORDER BY
-    order_clause = """
-    ORDER BY 
-        CASE WHEN (SELECT 1 FROM pragma_table_info(?) WHERE name='DATE_SIGNATURE') THEN DATE_SIGNATURE END DESC,
-        id DESC
-    """
-    # On ne peut pas paramétrer un identifiant dans PRAGMA_TABLE_INFO (?) -> simplifions:
-    # On teste la présence de la colonne via pragma pour choisir l'ORDER BY en Python.
-    has_date_signature = False
-    try:
-        cols = [r[1] for r in cur.execute(f"PRAGMA table_info({view_name})").fetchall()]
-        has_date_signature = "DATE_SIGNATURE" in cols
-    except Exception:
-        pass
-    order_by = "ORDER BY DATE_SIGNATURE DESC, id DESC" if has_date_signature else "ORDER BY id DESC"
-
-    sql = f"SELECT * FROM {view_name} {where} {order_by} LIMIT ? OFFSET ?"
-    params.extend([per_page, offset])
-    rows = cur.execute(sql, params).fetchall()
-
-    con.close()
-    return total, rows
-
-
-@app.route("/clients/sfr")
-def clients_sfr():
-    page = int(request.args.get("page", 1))
-    per_page = int(request.args.get("per_page", 50))
-    q = request.args.get("q", "").strip()
-    total, rows = _query_rows("clients_sfr", page=page, per_page=per_page, q=q)
-    return render_template(
-        "clients_list.html",
-        title="Clients SFR",
-        rows=rows, page=page, per_page=per_page, total=total, q=q,
-        base_path="/clients/sfr"
-    )
-
-
-@app.route("/clients/valandre")
-def clients_valandre():
-    page = int(request.args.get("page", 1))
-    per_page = int(request.args.get("per_page", 50))
-    q = request.args.get("q", "").strip()
-    total, rows = _query_rows("clients_valandre_view", page=page, per_page=per_page, q=q)
-    return render_template(
-        "clients_list.html",
-        title="Clients Valandre",
-        rows=rows, page=page, per_page=per_page, total=total, q=q,
-        base_path="/clients/valandre"
-    )
-
-
-# ... existing code ...
-
-
-# ──────────────────────────────────────────────────────────────
+# ──────────────────────────────────────────────────────────────────────────────
 # Entrée principale
-# ──────────────────────────────────────────────────────────────
+# ──────────────────────────────────────────────────────────────────────────────
 if __name__ == '__main__':
     socketio.run(app, debug=True)
