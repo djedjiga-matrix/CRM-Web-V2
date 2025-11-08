@@ -63,6 +63,17 @@ def test_ensure_crm_schema_creates_expected_objects(tmp_path: Path) -> None:
         for column in {"PAYS_CODE", "photo", "TV"}:
             assert column in agent_columns
 
+        client_indexes = _index_names(conn, "clients")
+        assert {
+            "idx_clients_telephone",
+            "idx_clients_call_id",
+            "idx_clients_agent",
+            "idx_clients_campagne",
+        }.issubset(client_indexes)
+
+        agent_indexes = _index_names(conn, "agents")
+        assert {"idx_agents_tv", "idx_agents_role"}.issubset(agent_indexes)
+
         cur = conn.execute("SELECT nom, type_export FROM campagnes")
         campaigns = cur.fetchall()
         assert len(campaigns) == 3
@@ -71,6 +82,9 @@ def test_ensure_crm_schema_creates_expected_objects(tmp_path: Path) -> None:
             "VALANDRE",
             "HUMANITAIRE",
         }
+
+        campagne_indexes = _index_names(conn, "campagnes")
+        assert "idx_campagnes_nom" in campagne_indexes
 
 
 def test_ensure_crm_schema_adds_missing_columns(tmp_path: Path) -> None:

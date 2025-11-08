@@ -22,7 +22,7 @@ from __future__ import annotations
 from contextlib import contextmanager
 import os
 import sqlite3
-from typing import Iterable
+from typing import Iterable, Mapping
 
 
 @contextmanager
@@ -59,6 +59,19 @@ def _ensure_columns(
             cursor.execute(f"ALTER TABLE {table} ADD COLUMN {definition}")
 
 
+def _ensure_indexes(
+    cursor: sqlite3.Cursor,
+    index_statements: Mapping[str, str],
+) -> None:
+    """Create each index in ``index_statements`` if it does not exist yet."""
+
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='index'")
+    existing = {row[0] for row in cursor.fetchall()}
+    for index_name, statement in index_statements.items():
+        if index_name not in existing:
+            cursor.execute(statement)
+
+
 def ensure_crm_schema(db_path: str) -> None:
     """Ensure the main CRM SQLite database contains the expected schema."""
 
@@ -91,6 +104,8 @@ def ensure_crm_schema(db_path: str) -> None:
         )
 
         client_columns = {
+            "TELEPHONE": "TELEPHONE TEXT DEFAULT ''",
+            "AGENT": "AGENT TEXT DEFAULT ''",
             "CAMPAGNE_ID": "campagne_id INTEGER DEFAULT 1",
             "TITRE": "TITRE TEXT DEFAULT ''",
             "NOM_VENDEUR": "NOM_VENDEUR TEXT DEFAULT ''",
@@ -125,6 +140,16 @@ def ensure_crm_schema(db_path: str) -> None:
 
         _ensure_columns(cur, "clients", client_columns)
 
+        _ensure_indexes(
+            cur,
+            {
+                "idx_clients_telephone": "CREATE INDEX IF NOT EXISTS idx_clients_telephone ON clients(TELEPHONE)",
+                "idx_clients_call_id": "CREATE INDEX IF NOT EXISTS idx_clients_call_id ON clients(CALL_ID)",
+                "idx_clients_agent": "CREATE INDEX IF NOT EXISTS idx_clients_agent ON clients(AGENT)",
+                "idx_clients_campagne": "CREATE INDEX IF NOT EXISTS idx_clients_campagne ON clients(campagne_id)",
+            },
+        )
+
         # --- agents ------------------------------------------------------
         cur.execute(
             """
@@ -142,12 +167,19 @@ def ensure_crm_schema(db_path: str) -> None:
             """
         )
         agent_columns = {
+            "ROLE": "ROLE TEXT NOT NULL DEFAULT 'agent'",
             "PAYS_CODE": "PAYS_CODE TEXT",
             "PHOTO": "photo TEXT",
             "TV": "TV TEXT",
         }
         _ensure_columns(cur, "agents", agent_columns)
-        cur.execute("CREATE INDEX IF NOT EXISTS idx_agents_tv ON agents(TV)")
+        _ensure_indexes(
+            cur,
+            {
+                "idx_agents_tv": "CREATE INDEX IF NOT EXISTS idx_agents_tv ON agents(TV)",
+                "idx_agents_role": "CREATE INDEX IF NOT EXISTS idx_agents_role ON agents(ROLE)",
+            },
+        )
 
         # --- journal_connexions -----------------------------------------
         cur.execute(
@@ -202,6 +234,13 @@ def ensure_crm_schema(db_path: str) -> None:
                     (nom, type_export),
                 )
 
+        _ensure_indexes(
+            cur,
+            {
+                "idx_campagnes_nom": "CREATE UNIQUE INDEX IF NOT EXISTS idx_campagnes_nom ON campagnes(nom)",
+            },
+        )
+
 
 def ensure_primes_table(db_path: str) -> None:
     """Ensure the ``primes_huma`` table exists in the CRM database."""
@@ -221,11 +260,11 @@ def ensure_primes_table(db_path: str) -> None:
             )
             """
         )
-        cur.execute(
-            """
-            CREATE INDEX IF NOT EXISTS idx_primes_cible
-            ON primes_huma(dons_cible, don_moyen_cible)
-            """
+        _ensure_indexes(
+            cur,
+            {
+                "idx_primes_cible": "CREATE INDEX IF NOT EXISTS idx_primes_cible ON primes_huma(dons_cible, don_moyen_cible)",
+            },
         )
 
 
@@ -275,8 +314,13 @@ def ensure_huma_schema(db_path: str) -> None:
             """
         )
 
-        cur.execute("CREATE INDEX IF NOT EXISTS idx_calls_date ON calls(call_date)")
-        cur.execute("CREATE INDEX IF NOT EXISTS idx_calls_agent ON calls(agent)")
-        cur.execute("CREATE INDEX IF NOT EXISTS idx_calls_base ON calls(base)")
-        cur.execute("CREATE INDEX IF NOT EXISTS idx_grh_jour ON grh_hours(jour)")
-        cur.execute("CREATE INDEX IF NOT EXISTS idx_grh_agent ON grh_hours(agent)")
+        _ensure_indexes(
+            cur,
+            {
+                "idx_calls_date": "CREATE INDEX IF NOT EXISTS idx_calls_date ON calls(call_date)",
+                "idx_calls_agent": "CREATE INDEX IF NOT EXISTS idx_calls_agent ON calls(agent)",
+                "idx_calls_base": "CREATE INDEX IF NOT EXISTS idx_calls_base ON calls(base)",
+                "idx_grh_jour": "CREATE INDEX IF NOT EXISTS idx_grh_jour ON grh_hours(jour)",
+                "idx_grh_agent": "CREATE INDEX IF NOT EXISTS idx_grh_agent ON grh_hours(agent)",
+            },
+        )
