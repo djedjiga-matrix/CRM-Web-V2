@@ -1,0 +1,10 @@
+{
+    "workbench.colorTheme": "Cursor Light",
+    "zenMode.centerLayout": true,
+    "zenMode.fullScreen": true,
+    "zenMode.hideActivityBar": true,
+    "zenMode.hideLineNumbers": true,
+    "zenMode.hideStatusBar": true,
+    "workbench.settings.useSplitJSON": false,
+    "workbench.activityBar.iconClickBehavior": "toggle"
+}

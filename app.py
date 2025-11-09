@@ -94,6 +94,27 @@ def _to_iso(d: str | None, default: date) -> str:
     return default.isoformat()
 
 # ---------------------------------------------------------------------------
+# Constantes métiers réutilisables
+# ---------------------------------------------------------------------------
+CU_STATUSES: tuple[str, ...] = (
+    "REF refus",
+    "DAM don avec montant",
+    "Indécis Don",
+    "Don par email",
+    "PAM Pa mensuel",
+    "PAT Pa Trimestriel",
+)
+
+DON_STATUSES: tuple[str, ...] = (
+    "DAM don avec montant",
+    "Don par email",
+    "PAM Pa mensuel",
+    "PAT Pa Trimestriel",
+)
+
+DON_MAIL_STATUS = "Don par email"
+
+# ---------------------------------------------------------------------------
 # Helpers Aircall / numéros
 # ---------------------------------------------------------------------------
 def _normalize_phone(num: str) -> str:
@@ -205,18 +226,6 @@ csrf = CSRFProtect(app)
 
 # ======================= Dashboard Humanitaire (safe-format) =======================
 
-import sqlite3
-
-import pandas as pd
-
-from datetime import datetime, date
-
-from flask import request, render_template, redirect, url_for, session
-
-import os
-
-
-
 # -- Helpers d'analyse/formatage (côté Python, pour éviter les TypeError dans Jinja)
 
 def _parse_date_safe(s: str):
@@ -312,7 +321,6 @@ except NameError:
     HUMA_DB_NAME = os.getenv("HUMA_DB", "humanitaire.db")
 
 DATA_DIR = os.path.join(os.path.dirname(__file__), "Data")
-DB_PATH = os.path.join(os.path.dirname(__file__), "humanitaire.db")
 INBOX_APPELS = os.path.join(DATA_DIR, "inbox", "*.csv")
 ARCHIVE_APPELS = os.path.join(DATA_DIR, "archive")
 
@@ -324,20 +332,8 @@ import io
 
 @app.route("/dashboard_humanitaire")
 def dashboard_humanitaire():
-    import sqlite3
-    import pandas as pd
-    from datetime import date, datetime
-
     if "agent_nom" not in session:
         return redirect(url_for("login"))
-
-    def _parse_date_safe(val):
-        if not val:
-            return None
-        try:
-            return datetime.strptime(val, "%Y-%m-%d").date()
-        except Exception:
-            return None
 
     # filtres
     date_debut = _parse_date_safe(request.args.get("debut"))
@@ -347,24 +343,9 @@ def dashboard_humanitaire():
     debut_sql = date_debut.isoformat() if date_debut else "0001-01-01"
     fin_sql   = date_fin.isoformat()   if date_fin   else "9999-12-31"
 
-    DB_PATH = "humanitaire.db"
+    db_path = HUMA_DB_NAME
 
-    CU_STATUTS = (
-        "REF refus",
-        "DAM don avec montant",
-        "Indécis Don",
-        "Don par email",
-        "PAM Pa mensuel",
-        "PAT Pa Trimestriel",
-    )
-    DON_STATUTS = (
-        "DAM don avec montant",
-        "Don par email",
-        "PAM Pa mensuel",
-        "PAT Pa Trimestriel",
-    )
-
-    with sqlite3.connect(DB_PATH) as con:
+    with sqlite3.connect(db_path) as con:
         # 1) on récupère toutes les bases pour alimenter le filtre
         asso_rows = con.execute("""
             SELECT DISTINCT UPPER(SUBSTR(COALESCE(base,''),1,3)) AS asso
@@ -427,16 +408,16 @@ def dashboard_humanitaire():
         }
     else:
         df["lib_status_norm"] = df["lib_status"].fillna("").str.strip()
-        df["is_cu"] = df["lib_status_norm"].isin(CU_STATUTS).astype(int)
-        df["is_don"] = df["lib_status_norm"].isin(DON_STATUTS).astype(int)
-        df["is_don_mail"] = (df["lib_status_norm"] == "Don par email").astype(int)
+        df["is_cu"] = df["lib_status_norm"].isin(CU_STATUSES).astype(int)
+        df["is_don"] = df["lib_status_norm"].isin(DON_STATUSES).astype(int)
+        df["is_don_mail"] = (df["lib_status_norm"] == DON_MAIL_STATUS).astype(int)
 
         def _montant_if_don(row):
             try:
                 v = float(row["don_val"])
             except Exception:
                 v = 0.0
-            return v if row["lib_status_norm"] in DON_STATUTS else 0.0
+            return v if row["lib_status_norm"] in DON_STATUSES else 0.0
 
         df["montant_don"] = df.apply(_montant_if_don, axis=1)
 
@@ -500,22 +481,11 @@ def dashboard_humanitaire():
         fin=(date_fin.isoformat() if date_fin else ""),
         auj=date.today().isoformat(),
     )
+
 @app.route("/dashboard_huma_agents_stats")
 def dashboard_huma_agents_stats():
-    import sqlite3, os
-    import pandas as pd
-    from datetime import datetime, date
-
     if "agent_nom" not in session:
         return redirect(url_for("login"))
-
-    def _parse_date_safe(val):
-        if not val:
-            return None
-        try:
-            return datetime.strptime(val, "%Y-%m-%d").date()
-        except Exception:
-            return None
 
     # -------- filtres --------
     today = date.today()
@@ -531,24 +501,9 @@ def dashboard_huma_agents_stats():
     debut_sql = date_debut.isoformat()
     fin_sql   = date_fin.isoformat()
 
-    DB_PATH = "humanitaire.db"
+    db_path = HUMA_DB_NAME
 
-    CU_STATUTS = (
-        "REF refus",
-        "DAM don avec montant",
-        "Indécis Don",
-        "Don par email",
-        "PAM Pa mensuel",
-        "PAT Pa Trimestriel",
-    )
-    DON_STATUTS = (
-        "DAM don avec montant",
-        "Don par email",
-        "PAM Pa mensuel",
-        "PAT Pa Trimestriel",
-    )
-
-    with sqlite3.connect(DB_PATH) as con:
+    with sqlite3.connect(db_path) as con:
         # liste des agents pour le select
         ag_rows = con.execute("""
             SELECT DISTINCT agent
@@ -604,16 +559,16 @@ def dashboard_huma_agents_stats():
 
     # enrichissement
     df["lib_status_norm"] = df["lib_status"].fillna("").str.strip()
-    df["is_cu"] = df["lib_status_norm"].isin(CU_STATUTS).astype(int)
-    df["is_don"] = df["lib_status_norm"].isin(DON_STATUTS).astype(int)
-    df["is_don_mail"] = (df["lib_status_norm"] == "Don par email").astype(int)
+    df["is_cu"] = df["lib_status_norm"].isin(CU_STATUSES).astype(int)
+    df["is_don"] = df["lib_status_norm"].isin(DON_STATUSES).astype(int)
+    df["is_don_mail"] = (df["lib_status_norm"] == DON_MAIL_STATUS).astype(int)
 
     def _montant_if_don(row):
         try:
             v = float(row["don_val"])
         except Exception:
             v = 0.0
-        return v if row["lib_status_norm"] in DON_STATUTS else 0.0
+        return v if row["lib_status_norm"] in DON_STATUSES else 0.0
 
     df["montant_don"] = df.apply(_montant_if_don, axis=1)
 
@@ -717,7 +672,7 @@ def run_etl():
     Relance le script etl_incremental.py pour importer les nouvelles bases CSV et GRH XLSX.
     """
     try:
-        db_path = "humanitaire.db"
+        db_path = HUMA_DB_NAME
         appels_glob = os.path.join("Data", "inbox", "*.csv")
         grh_glob = os.path.join("Data", "*.xlsx")
 
@@ -916,25 +871,10 @@ def export_kpi_xlsx():
 
     )
 
-# ================== FIN DU BLOC DASHBOARD ==================
-from flask import Response
-
 @app.route("/dashboard_huma_agents")
 def dashboard_huma_agents():
-    from datetime import date, datetime
-    import pandas as pd
-    import sqlite3
-
     if "agent_nom" not in session:
         return redirect(url_for("login"))
-
-    def _parse_date_safe(val):
-        if not val:
-            return None
-        try:
-            return datetime.strptime(val, "%Y-%m-%d").date()
-        except Exception:
-            return None
 
     date_debut = _parse_date_safe(request.args.get("debut"))
     date_fin   = _parse_date_safe(request.args.get("fin"))
@@ -944,9 +884,9 @@ def dashboard_huma_agents():
 
     debut_sql = date_debut.isoformat() if date_debut else "0001-01-01"
     fin_sql   = date_fin.isoformat()   if date_fin   else "9999-12-31"
-    DB_PATH   = "humanitaire.db"
+    db_path   = HUMA_DB_NAME
 
-    with sqlite3.connect(DB_PATH) as con:
+    with sqlite3.connect(db_path) as con:
         calls_df = pd.read_sql(
             """
             SELECT
@@ -978,24 +918,9 @@ def dashboard_huma_agents():
     else:
         calls_df["lib_status_norm"] = calls_df["lib_status"].fillna("").str.strip()
 
-        CU_STATUTS = (
-            "REF refus",
-            "DAM don avec montant",
-            "Indécis Don",
-            "Don par email",
-            "PAM Pa mensuel",
-            "PAT Pa Trimestriel",
-        )
-        DON_STATUTS = (
-            "DAM don avec montant",
-            "Don par email",
-            "PAM Pa mensuel",
-            "PAT Pa Trimestriel",
-        )
-
-        calls_df["is_cu"]       = calls_df["lib_status_norm"].isin(CU_STATUTS).astype(int)
-        calls_df["is_don"]      = calls_df["lib_status_norm"].isin(DON_STATUTS).astype(int)
-        calls_df["is_don_mail"] = (calls_df["lib_status_norm"] == "Don par email").astype(int)
+        calls_df["is_cu"]       = calls_df["lib_status_norm"].isin(CU_STATUSES).astype(int)
+        calls_df["is_don"]      = calls_df["lib_status_norm"].isin(DON_STATUSES).astype(int)
+        calls_df["is_don_mail"] = (calls_df["lib_status_norm"] == DON_MAIL_STATUS).astype(int)
         calls_df["is_indecis"]  = calls_df["lib_status_norm"].str.contains("indécis", case=False).astype(int)
 
         def _montant_if_don(row):
@@ -1003,7 +928,7 @@ def dashboard_huma_agents():
                 val = float(row["don_val"])
             except Exception:
                 val = 0.0
-            return val if row["lib_status_norm"] in DON_STATUTS else 0.0
+            return val if row["lib_status_norm"] in DON_STATUSES else 0.0
 
         calls_df["montant_don"] = calls_df.apply(_montant_if_don, axis=1)
 
@@ -2226,9 +2151,6 @@ def modifier_client(client_id):
       - sinon, on vérifie si l'id existe dans clients_valandre, à défaut on utilise clients.
     Met à jour uniquement les colonnes réellement présentes (ex: MODIFIE_PAR/DATE_MODIF optionnelles).
     """
-    from datetime import datetime
-    import sqlite3, unicodedata
-
     if 'agent_nom' not in session:
         return redirect(url_for('login'))
 
@@ -3223,23 +3145,9 @@ def overview():
     conn.close()
 
     # HUMANITAIRE
-    DB_PATH_HUMA = "humanitaire.db"
-    CU_STATUTS = (
-        "REF refus",
-        "DAM don avec montant",
-        "Indécis Don",
-        "Don par email",
-        "PAM Pa mensuel",
-        "PAT Pa Trimestriel",
-    )
-    DON_STATUTS = (
-        "DAM don avec montant",
-        "Don par email",
-        "PAM Pa mensuel",
-        "PAT Pa Trimestriel",
-    )
+    db_path_huma = HUMA_DB_NAME
 
-    with sqlite3.connect(DB_PATH_HUMA) as con_huma:
+    with sqlite3.connect(db_path_huma) as con_huma:
         con_huma.row_factory = sqlite3.Row
         # liste agents
         agents_huma = [r["agent"] for r in con_huma.execute(
@@ -3291,15 +3199,15 @@ def overview():
         }
     else:
         df_huma["lib_status_norm"] = df_huma["lib_status"].fillna("").str.strip()
-        df_huma["is_cu"] = df_huma["lib_status_norm"].isin(CU_STATUTS).astype(int)
-        df_huma["is_don"] = df_huma["lib_status_norm"].isin(DON_STATUTS).astype(int)
+        df_huma["is_cu"] = df_huma["lib_status_norm"].isin(CU_STATUSES).astype(int)
+        df_huma["is_don"] = df_huma["lib_status_norm"].isin(DON_STATUSES).astype(int)
 
         def _montant_if_don(row):
             try:
                 v = float(row["don_val"])
             except Exception:
                 v = 0.0
-            return v if row["lib_status_norm"] in DON_STATUTS else 0.0
+            return v if row["lib_status_norm"] in DON_STATUSES else 0.0
 
         df_huma["montant_don"] = df_huma.apply(_montant_if_don, axis=1)
 
@@ -3465,7 +3373,7 @@ def admin_refresh_import():
     if "agent_nom" not in session:
         return redirect(url_for("login"))
 
-    con = sqlite3.connect(DB_PATH)
+    con = sqlite3.connect(HUMA_DB_NAME)
     con.execute("PRAGMA journal_mode=WAL;")
     ensure_schema_incremental(con)
 
@@ -3821,11 +3729,6 @@ def admin_huma_sync_agents():
 
 @app.route("/dashboard_ca_projets")
 def dashboard_ca_projets():
-    import sqlite3, os
-    import pandas as pd
-    from datetime import date
-    from flask import request
-
     if "agent_nom" not in session:
         return redirect(url_for("login"))
 
@@ -3834,7 +3737,7 @@ def dashboard_ca_projets():
     today = date.today()
     mois_courant = today.strftime("%Y-%m")
 
-    crm_db = "crm_clients.db"
+    crm_db = DB_NAME
 
     # -----------------------------
     # 1) SFR & VALANDRE (données brutes)
@@ -3928,7 +3831,7 @@ def dashboard_ca_projets():
     # -----------------------------
     # 2) HUMANITAIRE par association (comme avant)
     # -----------------------------
-    huma_db = "humanitaire.db"
+    huma_db = HUMA_DB_NAME
     asso_rows = []
     if os.path.exists(huma_db):
         with sqlite3.connect(huma_db) as con:
@@ -3942,24 +3845,9 @@ def dashboard_ca_projets():
             """, con)
 
         if not df_h.empty:
-            CU_STATUTS = (
-                "REF refus",
-                "DAM don avec montant",
-                "Indécis Don",
-                "Don par email",
-                "PAM Pa mensuel",
-                "PAT Pa Trimestriel",
-            )
-            DON_STATUTS = (
-                "DAM don avec montant",
-                "Don par email",
-                "PAM Pa mensuel",
-                "PAT Pa Trimestriel",
-            )
-
             df_h["asso"] = df_h["base"].str.slice(0, 3).str.upper()
-            df_h["is_cu"] = df_h["lib_status"].isin(CU_STATUTS).astype(int)
-            df_h["is_don"] = df_h["lib_status"].isin(DON_STATUTS).astype(int)
+            df_h["is_cu"] = df_h["lib_status"].isin(CU_STATUSES).astype(int)
+            df_h["is_don"] = df_h["lib_status"].isin(DON_STATUSES).astype(int)
 
             tmp = []
             for asso, g in df_h.groupby("asso"):
@@ -4017,13 +3905,6 @@ def dashboard_ca_projets():
 # Routes: listes des clients par campagne (SFR / Valandre)
 # Vue SQLite requise: clients_sfr, clients_valandre_view
 # ------------------------------------------------------------
-import os, sqlite3
-
-from flask import request, render_template
-
-
-# Récupération du nom de la base depuis .env (sinon fallback)
-DB_NAME = os.getenv("DB_NAME", "crm_clients.db")
 
 
 def _query_rows(view_name: str, page: int = 1, per_page: int = 50, q: str = ""):
