@@ -129,6 +129,44 @@ def test_ensure_primes_table_creates_table_and_index(tmp_path: Path) -> None:
         assert "idx_primes_cible" in indexes
 
 
+def test_ensure_crm_schema_deduplicates_campaigns(tmp_path: Path) -> None:
+    db_path = tmp_path / "crm.db"
+    with sqlite3.connect(db_path) as conn:
+        conn.execute(
+            """
+            CREATE TABLE campagnes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                nom TEXT NOT NULL,
+                type_export TEXT
+            )
+            """
+        )
+        conn.executemany(
+            "INSERT INTO campagnes(nom, type_export) VALUES (?, ?)",
+            [
+                ("  EXOSPHERE_SFR  ", "simple"),
+                ("EXOSPHERE_SFR", "special"),
+                ("VALANDRE", None),
+            ],
+        )
+
+    ensure_crm_schema(str(db_path))
+
+    with sqlite3.connect(db_path) as conn:
+        cur = conn.execute(
+            "SELECT nom, type_export FROM campagnes ORDER BY nom"
+        )
+        rows = cur.fetchall()
+        assert rows == [
+            ("EXOSPHERE_SFR", "simple"),
+            ("HUMANITAIRE", "simple"),
+            ("VALANDRE", "simple"),
+        ]
+
+        indexes = _index_names(conn, "campagnes")
+        assert "idx_campagnes_nom" in indexes
+
+
 def test_ensure_huma_schema_creates_tables_and_indexes(tmp_path: Path) -> None:
     db_path = tmp_path / "huma.db"
     ensure_huma_schema(str(db_path))

@@ -23,7 +23,7 @@ from dataclasses import dataclass, field
 from contextlib import contextmanager
 import os
 import sqlite3
-from typing import Iterable, Mapping, Sequence
+from typing import Callable, Iterable, Mapping, Sequence
 
 
 PRODUCT_COLUMNS = (
@@ -67,6 +67,7 @@ class TableDefinition:
     column_definitions: Mapping[str, str] = field(default_factory=dict)
     indexes: Mapping[str, str] = field(default_factory=dict)
     seed_data: SeedData | None = None
+    pre_index_hook: Callable[[sqlite3.Cursor], None] | None = None
 
 
 @contextmanager
@@ -139,6 +140,8 @@ def _apply_table_definition(cursor: sqlite3.Cursor, definition: TableDefinition)
     cursor.execute(definition.create_sql)
     if definition.column_definitions:
         _ensure_columns(cursor, definition.name, dict(definition.column_definitions))
+    if definition.pre_index_hook is not None:
+        definition.pre_index_hook(cursor)
     if definition.indexes:
         _ensure_indexes(cursor, definition.indexes)
     if definition.seed_data is not None:
@@ -287,6 +290,35 @@ def _campagnes_definition() -> TableDefinition:
             rows=DEFAULT_CAMPAIGNS,
             unique_column="nom",
         ),
+        pre_index_hook=_deduplicate_campaigns,
+    )
+
+
+def _deduplicate_campaigns(cursor: sqlite3.Cursor) -> None:
+    """Remove duplicate campaign names before enforcing the unique index."""
+
+    # Nettoie les espaces parasites susceptibles de créer des doublons "cachés"
+    cursor.execute("UPDATE campagnes SET nom = TRIM(nom) WHERE nom <> TRIM(nom)")
+
+    # Supprime les doublons en ne conservant que la première occurrence (ROWID le plus bas)
+    cursor.execute(
+        """
+        DELETE FROM campagnes
+              WHERE rowid NOT IN (
+                    SELECT MIN(rowid)
+                      FROM campagnes
+                     GROUP BY UPPER(nom)
+              )
+        """
+    )
+
+    # Garantit un type_export défini pour toutes les lignes restantes
+    cursor.execute(
+        """
+        UPDATE campagnes
+           SET type_export = 'simple'
+         WHERE type_export IS NULL OR TRIM(type_export) = ''
+        """
     )
 
 
