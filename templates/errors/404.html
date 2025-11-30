@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+
+{% block title %}Page non trouvée - CRM{% endblock %}
+
+{% block content %}
+<div class="min-h-screen flex items-center justify-center">
+    <div class="text-center">
+        <h1 class="text-6xl font-bold text-gray-600 dark:text-gray-400">404</h1>
+        <h2 class="text-2xl font-semibold mt-4 text-gray-800 dark:text-gray-200">Page non trouvée</h2>
+        <p class="text-gray-600 dark:text-gray-400 mt-2">La page que vous recherchez n'existe pas.</p>
+        <a href="{{ url_for('dashboard.index') if 'agent_nom' in session else url_for('auth.login') }}"
+           class="mt-6 inline-block px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
+            Retour
+        </a>
+    </div>
+</div>
+{% endblock %}
